@@ -209,6 +209,9 @@ tempCodeRunnerFile.py
 # PyPI configuration file
 .pypirc
 
+# Clarigrid local plugins (not part of open-source core)
+plugins/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
@@ -216,3 +219,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+.idea/
+*.iml
+
+.claude/
