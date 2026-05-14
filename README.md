@@ -14,9 +14,6 @@ Clarigrid provides a single, stable Python interface to access and normalise
 European energy market data from multiple sources. All data comes back as
 timezone-aware pandas DataFrames with consistent column names and units.
 
-**This package is the open-source core. It defines interfaces; it does not
-contain paid or proprietary data access.**
-
 ---
 
 ## Install
