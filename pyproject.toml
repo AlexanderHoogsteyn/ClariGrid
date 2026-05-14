@@ -35,6 +35,7 @@ dev = [
     "ruff",
     "mypy",
     "pandas-stubs",
+    "pytest",
 ]
 
 [project.scripts]
