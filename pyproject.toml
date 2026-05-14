@@ -23,19 +23,22 @@ classifiers = [
 
 dependencies = [
     "pandas>=2.0",
-    "pyarrow>=14.0",   # parquet cache
     "requests>=2.28",  # all built-in providers
+    # pyarrow is optional — cache gracefully degrades without it
 ]
 
 [project.optional-dependencies]
+cache  = ["pyarrow>=14.0"]
 entsoe = ["entsoe-py>=0.6"]
+all    = ["pyarrow>=14.0", "entsoe-py>=0.6"]
 dev = [
     "pytest>=8.0",
     "pytest-cov",
+    "pytest-timeout",
     "ruff",
     "mypy",
     "pandas-stubs",
-    "pytest",
+    "pyarrow>=14.0",  # needed to test cache
 ]
 
 [project.scripts]
@@ -51,6 +54,14 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 60           # per-test timeout in seconds (requires pytest-timeout)
+markers = [
+    "live: calls live external APIs; skip with -m 'not live'",
+]
+addopts = "-v"
 
 [tool.mypy]
 python_version = "3.10"
