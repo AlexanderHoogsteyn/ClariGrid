@@ -6,6 +6,7 @@ firm technical capacity, zone resolution logic, and electricity-method stubs.
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
 
 import clarigrid as cg
@@ -47,7 +48,10 @@ def test_entsog_gas_flows_direction_values():
     df = cg.get_gas_flows(
         "BE-TSO-0001", GAS_START, GAS_END, source="entsog", use_cache=False
     )
-    assert df["direction"].dtype == object, "direction should be string dtype"
+    # Pandas 2.x may infer StringDtype instead of object; check string-like either way.
+    assert pd.api.types.is_string_dtype(df["direction"]), (
+        f"direction should be string dtype, got {df['direction'].dtype}"
+    )
     bad = df.loc[~df["direction"].isin(["entry", "exit"]), "direction"].unique()
     assert len(bad) == 0, f"Unexpected direction values: {bad.tolist()}"
 
