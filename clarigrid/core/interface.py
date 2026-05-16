@@ -138,3 +138,61 @@ class GasDataProvider(DataProvider):
 
     def capabilities(self) -> set[str]:
         return {"gas_flows", "capacity"}
+
+
+class WeatherDataProvider(DataProvider):
+    """Base interface for weather / meteorological data providers.
+
+    Providers like Open-Meteo, RMI, and DWD implement this class.
+    They override the electricity stubs with informative errors and expose
+    ``get_weather()`` instead.
+    """
+
+    @abstractmethod
+    def get_weather(
+        self,
+        zone: str,
+        start: str,
+        end: str,
+        **kwargs,
+    ) -> pd.DataFrame:
+        """Return weather observations or forecast.
+
+        Args:
+            zone: Location identifier. Format is provider-specific:
+                - Open-Meteo: ``"lat,lon"`` (e.g. ``"50.85,4.35"``)
+                - RMI/SYNOP: station ID string (e.g. ``"6447"``)
+                - DWD: 5-digit station ID (e.g. ``"02564"``)
+            start: ISO date string.
+            end: ISO date string.
+            **kwargs: Provider-specific keyword args (e.g. ``variables``,
+                ``parameter``, ``dataset``, ``endpoint``).
+
+        Returns:
+            DataFrame with UTC ``DatetimeIndex``. Columns depend on the
+            requested variables / observation parameters.
+        """
+        raise NotImplementedError
+
+    # --- Electricity stubs ---------------------------------------------------
+
+    def get_prices(self, zone: str, start: str, end: str, **kwargs) -> pd.DataFrame:
+        raise NotImplementedError(
+            f"{self.name()} is a weather provider. "
+            "Use get_weather() for meteorological data."
+        )
+
+    def get_load(self, zone: str, start: str, end: str, **kwargs) -> pd.DataFrame:
+        raise NotImplementedError(
+            f"{self.name()} is a weather provider. "
+            "Use get_weather() for meteorological data."
+        )
+
+    def get_generation(self, zone: str, start: str, end: str, **kwargs) -> pd.DataFrame:
+        raise NotImplementedError(
+            f"{self.name()} is a weather provider. "
+            "Use get_weather() for meteorological data."
+        )
+
+    def capabilities(self) -> set[str]:
+        return {"weather"}

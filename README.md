@@ -4,7 +4,7 @@ Unified Python SDK for European energy market data.
 
 [![PyPI](https://img.shields.io/pypi/v/clarigrid)](https://pypi.org/project/clarigrid/)
 [![Python](https://img.shields.io/pypi/pyversions/clarigrid)](https://pypi.org/project/clarigrid/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ---
 
@@ -118,7 +118,7 @@ clarigrid/
 ### Plugin system
 
 The core package defines one interface (`DataProvider`) and a registry.
-Providers — free or paid — live in **separate packages** and register
+Providers live in **separate packages** and register
 themselves on import:
 
 ```python
@@ -154,4 +154,6 @@ mypy clarigrid
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+Apache 2.0 — see [LICENSE](LICENSE).
+
+Copyright (c) 2026 Alexander Hoogsteyn.

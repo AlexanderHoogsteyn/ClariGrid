@@ -9,9 +9,13 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-# Fixed two-day window with known historical data across all providers.
+# Fixed two-day window with known historical data across all energy providers.
 START = "2025-01-06"
 END = "2025-01-08"
+
+# Recent window for weather providers (DWD recent/ covers ~500 days back).
+WEATHER_START = "2026-02-01"
+WEATHER_END = "2026-02-03"
 
 
 def assert_valid_df(
@@ -56,3 +60,25 @@ def assert_valid_df(
             assert pd.api.types.is_numeric_dtype(df[col]), (
                 f"Column '{col}' is not numeric: dtype={df[col].dtype}"
             )
+
+
+def assert_valid_weather_df(
+    df: pd.DataFrame,
+    expected_cols: list[str] | None = None,
+    min_rows: int = 1,
+) -> None:
+    """Convenience wrapper for weather DataFrames.
+
+    Same contract as ``assert_valid_df`` but additionally verifies that every
+    column present is numeric (weather DataFrames should not have string cols).
+    """
+    assert_valid_df(df, expected_cols=expected_cols, min_rows=min_rows)
+    for col in df.columns:
+        assert pd.api.types.is_numeric_dtype(df[col]), (
+            f"Weather column '{col}' is not numeric: dtype={df[col].dtype}"
+        )
+
+
+def median_interval(df: pd.DataFrame) -> pd.Timedelta:
+    """Return median time interval between consecutive index entries."""
+    return df.index.to_series().diff().dropna().median()

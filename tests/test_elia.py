@@ -6,6 +6,7 @@ Prices are not published by Elia — test that NotImplementedError is raised.
 
 from __future__ import annotations
 
+import pandas as pd
 import pytest
 
 import clarigrid as cg
@@ -21,9 +22,13 @@ def test_elia_load_returns_load_mw():
 
 
 def test_elia_load_15min_resolution():
-    """Elia data is 15-min; 2 days → ≥192 rows."""
+    """Elia data is 15-min; verify row count and median interval == 15 min."""
     df = cg.get_load("BE", START, END, source="elia", use_cache=False)
     assert len(df) >= 192, f"Expected ≥192 rows (15-min × 2 days), got {len(df)}"
+    median_interval = df.index.to_series().diff().dropna().median()
+    assert median_interval == pd.Timedelta("15min"), (
+        f"Expected 15-min intervals, got median={median_interval}"
+    )
 
 
 def test_elia_generation_returns_fuel_columns():

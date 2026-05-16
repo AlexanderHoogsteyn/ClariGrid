@@ -84,7 +84,11 @@ class ElexonProvider(DataProvider):
             "to": pd.Timestamp(end).strftime("%Y-%m-%d"),
             "format": "json",
         }
-        records = _fetch_data("balancing/pricing/market-index", params)
+        # NOTE: the market-index endpoint ignores page/pageSize params and always
+        # returns the full date range in one response.  Use _fetch_raw (single GET)
+        # rather than _fetch_data (paginated) to avoid an infinite loop when the
+        # response size exceeds the configured page_size.
+        records = _fetch_raw("balancing/pricing/market-index", params)
 
         if not records:
             return pd.DataFrame()
