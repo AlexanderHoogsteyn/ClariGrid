@@ -11,6 +11,7 @@ from clarigrid.core.api import (
     get_generation,
     get_load,
     get_prices,
+    get_weather,
     list_providers,
     set_api_key,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "get_load",
     "get_generation",
     "get_gas_flows",
+    "get_weather",
     "set_api_key",
     "list_providers",
     "register_provider",

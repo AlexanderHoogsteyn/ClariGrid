@@ -25,7 +25,7 @@ from clarigrid.utils.time import normalise_index, parse_dt
 
 _BASE = "https://www.smard.de/app/chart_data"
 
-_FILTER_PRICE = 410
+_FILTER_PRICE = 4169
 _FILTER_LOAD = 4066
 
 _GENERATION_FILTERS: dict[str, int] = {

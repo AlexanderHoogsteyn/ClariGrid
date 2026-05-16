@@ -123,6 +123,16 @@ _DATE_FORMATS: dict[str, str] = {
     "monthly": "%Y%m",
 }
 
+# Some parameters use non-standard MESS_DATUM formats regardless of resolution.
+# Solar files use HH:MM notation (e.g. "1981010100:09" → %Y%m%d%H:%M).
+_PARAM_DATE_FMT_OVERRIDE: dict[str, str] = {
+    "solar": "%Y%m%d%H:%M",
+}
+
+# Parameters that store all data directly in the resolution directory (no
+# recent/ or historical/ subdirectory).  Files use the ``_row.zip`` suffix.
+_NO_PERIOD_SUBDIR: set[str] = {"solar"}
+
 # Timezone for DWD station data (UTC in recent files per DWD spec, but
 # some historical files use CET/CEST — we check and convert appropriately).
 _DWD_LOCAL_TZ = "Europe/Berlin"
@@ -130,7 +140,16 @@ _DWD_LOCAL_TZ = "Europe/Berlin"
 
 def _dir_url(resolution: str, parameter: str, period: str) -> str:
     param_dir = _PARAM_META[parameter][0]
+    if parameter in _NO_PERIOD_SUBDIR:
+        return f"{_CDC_BASE}/{resolution}/{param_dir}/"
     return f"{_CDC_BASE}/{resolution}/{param_dir}/{period}/"
+
+
+def _file_suffix(parameter: str, period: str) -> str:
+    """Return the expected ZIP filename suffix for a given parameter and period."""
+    if parameter in _NO_PERIOD_SUBDIR:
+        return "_row.zip"
+    return "_akt.zip" if period == "recent" else "_hist.zip"
 
 
 def _find_station_zip(
@@ -159,8 +178,8 @@ def _find_station_zip(
     if not matches:
         return None
 
-    # Prefer the exact match for the requested period suffix.
-    suffix = "_akt.zip" if period == "recent" else "_hist.zip"
+    # Prefer the exact match for the expected period suffix.
+    suffix = _file_suffix(parameter, period)
     for m in matches:
         if m.endswith(suffix):
             fname = m.split("/")[-1]
@@ -266,7 +285,9 @@ class DwdProvider(WeatherDataProvider):
             )
 
         _, _, col_map = _PARAM_META[parameter]
-        date_fmt = _DATE_FORMATS.get(resolution, "%Y%m%d%H")
+        date_fmt = _PARAM_DATE_FMT_OVERRIDE.get(
+            parameter, _DATE_FORMATS.get(resolution, "%Y%m%d%H")
+        )
         station_id = zone.zfill(5)
 
         periods_to_try: list[str]
