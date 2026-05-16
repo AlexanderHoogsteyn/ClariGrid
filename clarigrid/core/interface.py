@@ -51,14 +51,32 @@ class DataProvider(ABC):
     def capabilities(self) -> set[str]:
         """Declare which dataset types this provider supports.
 
-        Override to advertise supported methods. Used for introspection; does
-        not affect routing.
+        Override to advertise supported methods.  Used by the zone router to
+        determine which ``get_*`` calls can be satisfied.
 
         Returns:
             Set of strings from ``{"prices", "load", "generation",
-            "gas_flows", "capacity", "imbalance"}``.
+            "gas_flows", "capacity", "imbalance", "weather"}``.
         """
         return {"prices", "load", "generation"}
+
+    def zones(self) -> set[str]:
+        """Declare which bidding zones / area codes this provider covers.
+
+        Override with an explicit set of zone strings for zone-specific
+        providers (e.g. ``{"BE"}`` for Elia, ``{"GB"}`` for NESO).  Return
+        the default ``{"*"}`` to match *any* zone (wildcard behaviour —
+        appropriate for multi-country providers like ENTSOG or Open-Meteo
+        where the zone is a runtime parameter, not a compile-time constraint).
+
+        Zone codes should use the same format accepted by the public API
+        before alias resolution (e.g. ``"DE"`` not ``"DE_LU"`` — the router
+        applies ``resolve_zone()`` automatically).
+
+        Returns:
+            Set of zone strings, or ``{"*"}`` for all-zone providers.
+        """
+        return {"*"}
 
     def name(self) -> str:
         """Human-readable provider name."""

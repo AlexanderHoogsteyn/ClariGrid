@@ -171,6 +171,9 @@ class NesoProvider(DataProvider):
         })
         return normalise_index(df, STANDARD_TZ)
 
+    def zones(self) -> set[str]:
+        return {"GB"}
+
     def capabilities(self) -> set[str]:
         return {"load", "generation"}
 

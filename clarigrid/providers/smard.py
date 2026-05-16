@@ -20,7 +20,7 @@ import pandas as pd
 from clarigrid.core.http import get_json
 from clarigrid.core.interface import DataProvider
 from clarigrid.core.registry import register_provider
-from clarigrid.core.types import COLUMN_LOAD, COLUMN_PRICE, STANDARD_TZ
+from clarigrid.core.types import COLUMN_LOAD, STANDARD_TZ
 from clarigrid.utils.time import normalise_index, parse_dt
 
 _BASE = "https://www.smard.de/app/chart_data"
@@ -29,13 +29,13 @@ _FILTER_PRICE = 4169
 _FILTER_LOAD = 4066
 
 _GENERATION_FILTERS: dict[str, int] = {
-    "solar_mwh": 1223,
-    "wind_offshore_mwh": 1224,
-    "wind_onshore_mwh": 1225,
-    "lignite_mwh": 1226,
-    "hard_coal_mwh": 1227,
-    "gas_mwh": 1228,
-    "nuclear_mwh": 1229,
+    "solar_mw": 1223,
+    "wind_offshore_mw": 1224,
+    "wind_onshore_mw": 1225,
+    "lignite_mw": 1226,
+    "hard_coal_mw": 1227,
+    "gas_mw": 1228,
+    "nuclear_mw": 1229,
 }
 
 _REGION_MAP: dict[str, str] = {
@@ -117,7 +117,7 @@ class SmardProvider(DataProvider):
 
     def get_prices(self, zone: str, start: str, end: str, **kwargs) -> pd.DataFrame:
         s = _fetch_series(_FILTER_PRICE, zone, start, end)
-        return normalise_index(s.rename(COLUMN_PRICE).to_frame(), STANDARD_TZ)
+        return normalise_index(s.rename("price_eur_mwh").to_frame(), STANDARD_TZ)
 
     def get_load(self, zone: str, start: str, end: str, **kwargs) -> pd.DataFrame:
         s = _fetch_series(_FILTER_LOAD, zone, start, end)
@@ -140,6 +140,9 @@ class SmardProvider(DataProvider):
         df = pd.concat(frames, axis=1)
         df.columns = list(frames.keys())
         return normalise_index(df, STANDARD_TZ)
+
+    def zones(self) -> set[str]:
+        return {"DE", "DE_LU", "AT", "LU", "50HERTZ", "AMPRION", "TENNET", "TRANSNETBW"}
 
     def capabilities(self) -> set[str]:
         return {"prices", "load", "generation"}

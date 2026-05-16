@@ -22,9 +22,12 @@ from tests.conftest import END, START, assert_valid_df
 pytestmark = pytest.mark.live
 
 
-def test_elexon_prices_returns_gbp_mwh():
+def test_elexon_prices_returns_price_mwh():
     df = cg.get_prices("GB", START, END, source="elexon", use_cache=False)
-    assert_valid_df(df, expected_cols=["price_gbp_mwh"])
+    assert_valid_df(df, expected_cols=["price_mwh"])
+    assert df.attrs.get("currency") == "GBP", (
+        f"Expected currency='GBP' in df.attrs, got: {df.attrs}"
+    )
 
 
 def test_elexon_prices_30min_resolution():
@@ -53,7 +56,7 @@ def test_elexon_prices_7day_range_completes():
     infinite pagination loop.  This test verifies a 7-day query completes and
     returns 30-min data (≥336 rows = 7 days × 48 SPs)."""
     df = cg.get_prices("GB", "2025-01-13", "2025-01-19", source="elexon", use_cache=False)
-    assert_valid_df(df, expected_cols=["price_gbp_mwh"])
+    assert_valid_df(df, expected_cols=["price_mwh"])
     # Elexon API returns midnight-to-midnight: "2025-01-13" to "2025-01-19"
     # = 6 full days (288 SPs) + SP1 of Jan 19 = 289 rows.  Assert ≥ 280 to
     # give headroom for DST boundary days.

@@ -7,7 +7,7 @@ from typing import Optional
 
 STANDARD_TZ = "UTC"
 
-COLUMN_PRICE = "price_eur_mwh"
+COLUMN_PRICE = "price_mwh"
 COLUMN_LOAD = "load_mw"
 
 # Canonical bidding zone aliases — map common variants to ENTSO-E codes.

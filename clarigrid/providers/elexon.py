@@ -166,6 +166,9 @@ class ElexonProvider(DataProvider):
         pivot.columns.name = None
         return normalise_index(pivot, STANDARD_TZ)
 
+    def zones(self) -> set[str]:
+        return {"GB"}
+
     def capabilities(self) -> set[str]:
         return {"prices", "generation"}
 

@@ -166,6 +166,11 @@ class EntsogProvider(GasDataProvider):
             df = df.rename(columns={"flow_kwh_d": "capacity_kwh_d"})
         return df
 
+    def zones(self) -> set[str]:
+        # ENTSOG accepts any operator key, country code, or point key at
+        # runtime — wildcard matches all zones.
+        return {"*"}
+
     def name(self) -> str:
         return "ENTSOG Transparency Platform"
 

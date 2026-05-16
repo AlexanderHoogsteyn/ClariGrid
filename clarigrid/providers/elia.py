@@ -177,6 +177,9 @@ class EliaProvider(DataProvider):
         result = pd.DataFrame(frames)
         return normalise_index(result, STANDARD_TZ)
 
+    def zones(self) -> set[str]:
+        return {"BE"}
+
     def capabilities(self) -> set[str]:
         return {"load", "generation"}
 
