@@ -53,11 +53,18 @@ def connect(provider: str) -> None:
         Connected to Elia Open Data (Belgium) — 2 new table(s).
 
     Args:
-        provider: Registered provider name (e.g. ``"smard"``, ``"elia"``).
+        provider: Registered provider name (e.g. ``"smard"``, ``"elia"``,
+            ``"entsoe"``).
 
     Raises:
         KeyError: Provider not registered.
+        ConfigurationError: Key-required provider, non-interactive, no key found.
+        InvalidKeyError: Key found but rejected by the upstream API.
     """
+    # Auth gate: no-op for free providers; validates/acquires key for paid ones.
+    from clarigrid._auth import ensure_authenticated
+    ensure_authenticated(provider)
+
     _session.connect(provider)
 
 
