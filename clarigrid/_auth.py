@@ -74,11 +74,22 @@ FREE_PROVIDERS: frozenset[str] = frozenset(
     {"smard", "elia", "neso", "elexon", "entsog", "openmeteo"}
 )
 
-#: Base URL for the ClarigGrid web app (browser flow + token exchange).
+#: Base URL for the ClarigGrid web app (browser flow).
 #: Override with CLARIGRID_APP_URL for local dev or staging.
 import os as _os
 _APP_BASE_URL = _os.environ.get("CLARIGRID_APP_URL", "https://clarigrid.energy").rstrip("/")
-_TOKEN_EXCHANGE_URL = f"{_APP_BASE_URL}/api/cli/exchange-token"
+
+#: Base URL for backend API endpoints (token exchange, key fetching).
+#: Defaults to /api/cli under the app URL.
+#: Point directly at Supabase for testing (before clarigrid.energy is live):
+#:   export CLARIGRID_API_URL=https://YOUR_PROJECT.supabase.co/functions/v1
+_API_BASE_URL = _os.environ.get(
+    "CLARIGRID_API_URL",
+    f"{_APP_BASE_URL}/api/cli",
+).rstrip("/")
+
+_TOKEN_EXCHANGE_URL = f"{_API_BASE_URL}/exchange-cli-token"
+_FETCH_KEYS_URL = f"{_API_BASE_URL}/fetch-keys"
 
 
 # ── In-memory validation cache ─────────────────────────────────────────────
@@ -150,9 +161,17 @@ def _validate_entsoe(key: str) -> bool:
 
 
 def _validate_tennet(key: str) -> bool:
-    # Upstream API validation not yet implemented (provider in progress).
-    # Validate UUID format at minimum — rejects obviously wrong keys.
-    return bool(re.match(_UUID_PATTERN, key, re.IGNORECASE))
+    try:
+        import requests
+        resp = requests.get(
+            "https://api.tennet.eu/publications/v1/settlement-prices",
+            headers={"Accept": "text/csv", "apikey": key},
+            params={"date_from": "01-01-2025 00:00:00", "date_to": "01-01-2025 01:00:00"},
+            timeout=10,
+        )
+        return resp.status_code not in (401, 403)
+    except Exception:
+        return True  # Network error — assume valid, will fail on real request.
 
 
 # ── Main entry point ───────────────────────────────────────────────────────
@@ -174,7 +193,7 @@ def fetch_all_provider_keys(sdk_key: str) -> dict[str, str]:
 
     try:
         resp = requests.get(
-            f"{_APP_BASE_URL}/api/cli/fetch-keys",
+            _FETCH_KEYS_URL,
             headers={"Authorization": f"Bearer {sdk_key}"},
             timeout=15,
         )
