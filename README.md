@@ -90,7 +90,7 @@ clarigrid connect entsoe # authenticate a single provider
 browser is ever needed:
 
 ```bash
-export CLARIGRID_API_KEY=your-clarigrid-uuid
+export CLARIGRID_API_KEY=your-clarigrid-uuid 
 ```
 
 The SDK uses `CLARIGRID_API_KEY` to fetch all your stored provider keys
