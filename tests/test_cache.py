@@ -36,11 +36,11 @@ def clear_smard_cache():
 
 def _cache_file_exists() -> bool:
     """Return True if at least one SMARD cache parquet file exists."""
-    if not _cache._CACHE_DIR.exists():
+    if not _cache._manager._dir.exists():
         return False
     return any(
         f"_{PROVIDER}_" in f.name
-        for f in _cache._CACHE_DIR.glob("*.parquet")
+        for f in _cache._manager._dir.glob("*.parquet")
     )
 
 
@@ -110,7 +110,7 @@ def test_cache_disabled_no_crash(monkeypatch, recwarn):
     """When _PARQUET_OK is False, load() returns None and save() emits a warning
     without crashing."""
     monkeypatch.setattr(_cache, "_PARQUET_OK", False)
-    monkeypatch.setattr(_cache, "_warned", False)
+    monkeypatch.setattr(_cache._manager, "_warned", False)
 
     # load() must return None gracefully.
     result = _cache.load(PROVIDER, "prices", ZONE, START, END)

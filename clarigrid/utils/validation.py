@@ -17,5 +17,5 @@ def validate_date_range(start: str | pd.Timestamp, end: str | pd.Timestamp) -> N
     """Raise ValueError if range is invalid."""
     s = pd.Timestamp(start)
     e = pd.Timestamp(end)
-    if e <= s:
-        raise ValueError(f"end ({e}) must be after start ({s}).")
+    if e < s:
+        raise ValueError(f"end ({e}) must not be before start ({s}).")

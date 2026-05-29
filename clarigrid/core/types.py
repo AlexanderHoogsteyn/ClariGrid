@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
-
 STANDARD_TZ = "UTC"
 
-COLUMN_PRICE = "price_eur_mwh"
-COLUMN_LOAD = "load_mw"
+# ── Canonical column names ─────────────────────────────────────────────────
+# Single source of truth — import these everywhere instead of using literals.
 
-# Canonical bidding zone aliases — map common variants to ENTSO-E codes.
+COLUMN_PRICE    = "price_mwh"    # electricity price; currency in EnergyFrame.currency
+COLUMN_LOAD     = "load_mw"      # actual consumption / injection
+COLUMN_GAS_FLOW = "flow_kwh_d"   # gas physical flow (kWh per day)
+COLUMN_GAS_CAP  = "capacity_kwh_d"  # gas firm technical capacity (kWh per day)
+
+# ── Bidding zone aliases ───────────────────────────────────────────────────
+# Maps common variants to canonical ENTSO-E codes.
+
 ZONE_ALIASES: dict[str, str] = {
     "DE": "DE_LU",
     "GERMANY": "DE_LU",
@@ -20,13 +24,3 @@ ZONE_ALIASES: dict[str, str] = {
     "SPAIN": "ES",
     "ITALY_NORTH": "IT_NORD",
 }
-
-
-@dataclass
-class ProviderMeta:
-    name: str
-    version: str = "0.0.0"
-    homepage: str = ""
-    requires_api_key: bool = False
-    supported_zones: list[str] = field(default_factory=list)
-    supported_datasets: list[str] = field(default_factory=list)

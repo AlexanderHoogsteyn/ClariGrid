@@ -15,22 +15,27 @@ class DataProvider(ABC):
     """
 
     @abstractmethod
-    def get_prices(self, zone: str, start: str, end: str, **kwargs) -> pd.DataFrame:
+    def get_prices(
+        self, zone: str, start: str | pd.Timestamp, end: str | pd.Timestamp, **kwargs
+    ) -> pd.DataFrame:
         """Return day-ahead electricity prices.
 
         Args:
             zone: Bidding zone code (e.g. ``"BE"``, ``"DE_LU"``, ``"FR"``).
-            start: ISO date string or datetime-like.
-            end: ISO date string or datetime-like.
+            start: Start date — ISO string or ``pd.Timestamp``.
+            end: End date — ISO string or ``pd.Timestamp``.
 
         Returns:
-            DataFrame with UTC ``DatetimeIndex`` (``utc_time``) and column
-            ``price_eur_mwh``.
+            DataFrame with UTC ``DatetimeIndex`` (``utc_time``) and a price
+            column recognised by ``normalise_prices()`` (e.g. ``price_eur_mwh``
+            or ``price_gbp_mwh``).
         """
         raise NotImplementedError
 
     @abstractmethod
-    def get_load(self, zone: str, start: str, end: str, **kwargs) -> pd.DataFrame:
+    def get_load(
+        self, zone: str, start: str | pd.Timestamp, end: str | pd.Timestamp, **kwargs
+    ) -> pd.DataFrame:
         """Return actual total load.
 
         Returns:
@@ -39,26 +44,47 @@ class DataProvider(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_generation(self, zone: str, start: str, end: str, **kwargs) -> pd.DataFrame:
+    def get_generation(
+        self, zone: str, start: str | pd.Timestamp, end: str | pd.Timestamp, **kwargs
+    ) -> pd.DataFrame:
         """Return actual generation per source.
 
         Returns:
-            DataFrame with UTC ``DatetimeIndex``. Columns are generation type
-            names in MW (e.g. ``solar_mw``, ``wind_onshore_mw``).
+            DataFrame with UTC ``DatetimeIndex``. Columns are generation fuel
+            type names in MW (e.g. ``solar_mw``, ``wind_onshore_mw``).
         """
         raise NotImplementedError
 
     def capabilities(self) -> set[str]:
         """Declare which dataset types this provider supports.
 
-        Override to advertise supported methods. Used for introspection; does
-        not affect routing.
+        **Providers must override this method** and return an explicit set.
+        The default is ``set()`` (empty) — a provider that does not override
+        will not be routed to for any capability.
 
         Returns:
             Set of strings from ``{"prices", "load", "generation",
-            "gas_flows", "capacity", "imbalance"}``.
+            "gas_flows", "capacity", "weather"}``.
         """
-        return {"prices", "load", "generation"}
+        return set()
+
+    def zones(self) -> set[str]:
+        """Declare which bidding zones / area codes this provider covers.
+
+        Override with an explicit set of zone strings for zone-specific
+        providers (e.g. ``{"BE"}`` for Elia, ``{"GB"}`` for NESO).  Return
+        the default ``{"*"}`` to match *any* zone (wildcard behaviour —
+        appropriate for multi-country providers like ENTSOG or Open-Meteo
+        where the zone is a runtime parameter, not a compile-time constraint).
+
+        Zone codes should use the same format accepted by the public API
+        before alias resolution (e.g. ``"DE"`` not ``"DE_LU"`` — the router
+        applies ``resolve_zone()`` automatically).
+
+        Returns:
+            Set of zone strings, or ``{"*"}`` for all-zone providers.
+        """
+        return {"*"}
 
     def name(self) -> str:
         """Human-readable provider name."""
@@ -76,8 +102,8 @@ class GasDataProvider(DataProvider):
     def get_gas_flows(
         self,
         zone: str,
-        start: str,
-        end: str,
+        start: str | pd.Timestamp,
+        end: str | pd.Timestamp,
         *,
         indicator: str = "Physical Flow",
         period_type: str = "day",
@@ -105,8 +131,8 @@ class GasDataProvider(DataProvider):
     def get_capacity(
         self,
         zone: str,
-        start: str,
-        end: str,
+        start: str | pd.Timestamp,
+        end: str | pd.Timestamp,
         **kwargs,
     ) -> pd.DataFrame:
         """Return firm technical capacity for gas transmission points.
@@ -152,8 +178,8 @@ class WeatherDataProvider(DataProvider):
     def get_weather(
         self,
         zone: str,
-        start: str,
-        end: str,
+        start: str | pd.Timestamp,
+        end: str | pd.Timestamp,
         **kwargs,
     ) -> pd.DataFrame:
         """Return weather observations or forecast.

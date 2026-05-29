@@ -12,6 +12,9 @@ Covers:
 
 from __future__ import annotations
 
+import sys
+print(sys.executable)
+
 import pandas as pd
 import pytest
 from unittest.mock import patch
@@ -46,9 +49,9 @@ def clear_cache():
 
 
 def _cache_file_exists() -> bool:
-    if not _cache._CACHE_DIR.exists():
+    if not _cache._manager._dir.exists():
         return False
-    return any(f"_{PROVIDER}_" in f.name for f in _cache._CACHE_DIR.glob("*.parquet"))
+    return any(f"_{PROVIDER}_" in f.name for f in _cache._manager._dir.glob("*.parquet"))
 
 
 # ---------------------------------------------------------------------------
