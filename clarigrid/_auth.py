@@ -311,13 +311,18 @@ def _handle_missing(source: str) -> None:
         run_browser_flow(source)
         return
     except MissingDependencyError:
+        # clarigrid[auth] not installed — fall back to manual.
         print("  (browser flow requires clarigrid[auth] — falling back to manual entry)")
-    except AuthTimeoutError:
-        print("  Browser setup timed out.")
-        print("  Falling back to manual key entry...")
     except BrowserFlowError as exc:
-        print(f"  Browser setup failed: {exc}")
-        print("  Falling back to manual key entry...")
+        msg = str(exc)
+        if "not reachable" in msg:
+            # Site is down — fall back to manual immediately.
+            print(f"  {msg}")
+            print("  Falling back to manual key entry...")
+        else:
+            # Callback issue, cancellation, or timeout — re-raise with full message.
+            # Do NOT silently fall back: user may just need to check the browser.
+            raise
 
     run_prompt_flow(source)
 

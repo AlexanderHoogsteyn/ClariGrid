@@ -117,6 +117,24 @@ def get_output_tz() -> str:
     return _output_tz
 
 
+def reset() -> None:
+    """Reset all session state to defaults.
+
+    Disconnects all providers, clears the zone router, and resets the output
+    timezone to UTC.  Useful in tests and scripts that need a clean slate::
+
+        import clarigrid as cg
+        cg.reset()
+
+    After calling ``reset()``, providers must be reconnected with
+    ``cg.connect()`` before data can be fetched.
+    """
+    global _router, _connected, _output_tz
+    _router = ZoneRouter()
+    _connected = {}
+    _output_tz = "UTC"
+
+
 def apply_output_tz(df: pd.DataFrame) -> pd.DataFrame:
     """Convert a UTC DatetimeIndex to the current output timezone.
 

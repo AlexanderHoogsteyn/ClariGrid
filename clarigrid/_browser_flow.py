@@ -24,7 +24,18 @@ from clarigrid._auth import PROVIDER_AUTH, _TOKEN_EXCHANGE_URL
 from clarigrid._keystore import write_config
 from clarigrid.core.exceptions import AuthTimeoutError, BrowserFlowError
 
-_TIMEOUT_SECONDS = 120
+# Wait up to 10 minutes — user may need time to log in / verify email.
+# No fallback to manual on timeout; manual is only triggered when site is unreachable.
+_TIMEOUT_SECONDS = 600
+
+
+def _is_app_reachable(base_url: str) -> bool:
+    """Return True if the ClarigGrid web app responds to a HEAD request."""
+    try:
+        r = requests.head(base_url, timeout=5, allow_redirects=True)
+        return r.status_code < 500
+    except Exception:
+        return False
 
 
 # ── Port discovery ─────────────────────────────────────────────────────────
@@ -86,6 +97,13 @@ def _run_browser_flow(source: str) -> None:
     if cfg is None:
         raise BrowserFlowError(f"No auth config registered for source '{source}'.")
 
+    # Fail fast if the web app is unreachable — no point opening a browser.
+    if not _is_app_reachable(_APP_BASE_URL):
+        raise BrowserFlowError(
+            f"clarigrid.energy is not reachable. "
+            "Check your internet connection or set up your key manually."
+        )
+
     port = _find_free_port()
     callback_url = f"http://localhost:{port}/callback"
     login_url = (
@@ -107,16 +125,25 @@ def _run_browser_flow(source: str) -> None:
     opened = webbrowser.open(login_url)
     if not opened:
         print(f"  Could not open browser automatically.")
-        print(f"  Open this URL manually: {login_url}")
+        print(f"  Open this URL manually:")
+        print(f"  {login_url}")
 
-    print(f"  Waiting up to {_TIMEOUT_SECONDS}s for authentication...")
+    print(f"  Waiting for you to complete login in the browser...")
+    print(f"  (Press Ctrl+C to cancel and enter key manually)")
 
-    completed = _CallbackHandler._event.wait(timeout=_TIMEOUT_SECONDS)
+    try:
+        completed = _CallbackHandler._event.wait(timeout=_TIMEOUT_SECONDS)
+    except KeyboardInterrupt:
+        server.server_close()
+        raise BrowserFlowError("Browser authentication cancelled by user.")
+
     server.server_close()
 
     if not completed:
-        raise AuthTimeoutError(
-            f"Browser authentication timed out after {_TIMEOUT_SECONDS} seconds."
+        raise BrowserFlowError(
+            f"Browser authentication timed out after {_TIMEOUT_SECONDS // 60} minutes. "
+            "The login page may not be redirecting back correctly — "
+            "check that clarigrid.energy/auth/cli is implemented."
         )
 
     params = _CallbackHandler.result or {}

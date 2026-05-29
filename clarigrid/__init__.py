@@ -8,12 +8,14 @@ from clarigrid.core import cache  # exposed as cg.cache
 from clarigrid.core.api import (
     configure,
     connect,
+    get_capacity,
     get_gas_flows,
     get_generation,
     get_load,
     get_prices,
     get_weather,
     list_providers,
+    reset,
     set_api_key,
     set_timezone,
     status,
@@ -23,11 +25,13 @@ from clarigrid.core.registry import register_provider
 __all__ = [
     "connect",
     "configure",
+    "reset",
     "status",
     "get_prices",
     "get_load",
     "get_generation",
     "get_gas_flows",
+    "get_capacity",
     "get_weather",
     "set_api_key",
     "set_timezone",
@@ -66,7 +70,7 @@ def _check_first_run() -> None:
     except Exception:
         return
 
-    print("\nWelcome to ClarigGrid!")
+    print("\nWelcome to Clarigrid!")
     print("No configuration found.")
     try:
         answer = input("Set up your data source connections now? [Y/n]: ").strip().lower()

@@ -84,7 +84,7 @@ class ConfigurationError(AuthError):
     """No API key configured for a provider that requires one.
 
     Raised in non-interactive environments (CI, scripts) when the key is
-    completely absent.  Message is fully self-contained — the ClarigGrid
+    completely absent.  Message is fully self-contained — the Clarigrid
     website is not required to resolve it.
     """
 
@@ -94,7 +94,7 @@ class ConfigurationError(AuthError):
         reg_url: str = cfg["registration_url"]
         reg_instructions: str = cfg.get("registration_instructions", "")
         msg = (
-            f"ClarigGrid: no API key configured for '{source}'.\n"
+            f"Clarigrid: no API key configured for '{source}'.\n"
             "\n"
             "To fix this, choose one of:\n"
             "\n"
@@ -123,7 +123,7 @@ class InvalidKeyError(AuthError):
     def __init__(self, source: str, env_var: str) -> None:
         self.source = source
         msg = (
-            f"ClarigGrid: the API key for '{source}' was rejected by the upstream service.\n"
+            f"Clarigrid: the API key for '{source}' was rejected by the upstream service.\n"
             "\n"
             "This usually means the key has been revoked or has expired.\n"
             "\n"
@@ -140,7 +140,7 @@ class AuthTimeoutError(AuthError):
     def __init__(self, msg: str = "") -> None:
         if not msg:
             msg = (
-                "ClarigGrid: browser authentication timed out after 120 seconds.\n"
+                "Clarigrid: browser authentication timed out after 120 seconds.\n"
                 "\n"
                 "To complete setup manually:\n"
                 "  clarigrid setup\n"

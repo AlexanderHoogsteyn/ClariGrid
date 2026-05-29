@@ -79,6 +79,7 @@ class _EntryMeta:
     provider: str
     dataset: str
     zone: str
+    currency: str | None = None  # ISO currency code for price datasets ("EUR"/"GBP")
 
     @classmethod
     def from_file(cls, path: Path) -> "_EntryMeta":
@@ -104,8 +105,14 @@ class _EntryMeta:
 # ── Helper ─────────────────────────────────────────────────────────────────
 
 def _is_historical(end: Any) -> bool:
-    """Return True if *end* is strictly before today UTC (data is immutable)."""
-    return pd.Timestamp(end).date() < pd.Timestamp.now(tz="UTC").date()
+    """Return True if *end* is strictly before today UTC (data is immutable).
+
+    Uses UTC for both sides of the comparison — avoids false positives near
+    midnight when the local system timezone is ahead of UTC.
+    """
+    end_date = pd.Timestamp(end).tz_localize("UTC").date()
+    today_utc = pd.Timestamp.now(tz="UTC").date()
+    return end_date < today_utc
 
 
 # ── CacheManager ───────────────────────────────────────────────────────────
@@ -188,7 +195,16 @@ class CacheManager:
                 return None  # corrupt metadata → cache miss
 
         try:
-            return pd.read_parquet(parquet_path)
+            df = pd.read_parquet(parquet_path)
+            # Restore currency to attrs so normalise_prices() picks it up on cache hit.
+            if meta_path.exists():
+                try:
+                    m = _EntryMeta.from_file(meta_path)
+                    if m.currency:
+                        df.attrs["currency"] = m.currency
+                except Exception:
+                    pass
+            return df
         except Exception:
             return None
 
@@ -225,6 +241,7 @@ class CacheManager:
                 provider=provider,
                 dataset=dataset,
                 zone=zone,
+                currency=df.attrs.get("currency"),
             )
             meta.write(meta_path)
         except Exception:
