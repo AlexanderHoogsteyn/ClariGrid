@@ -47,3 +47,18 @@ def test_smard_generation_known_fuel_types():
     assert not missing, f"Missing fuel columns: {missing}. Got: {sorted(present)}"
     # Nuclear phased out Apr 2023 — must not appear.
     assert "nuclear_mw" not in present, "nuclear_mw unexpectedly present post-2023"
+
+
+def test_smard_generation_forecast_returns_wind_solar():
+    """Day-ahead generation forecast must carry wind + solar forecast columns."""
+    df = cg.get_generation_forecast("DE", START, END, source="smard", use_cache=False)
+    assert_valid_df(df)
+    present = set(df.columns)
+    required = {"solar_forecast_mw", "wind_onshore_forecast_mw"}
+    missing = required - present
+    assert not missing, f"Missing forecast columns: {missing}. Got: {sorted(present)}"
+
+
+def test_smard_residual_load_returns_residual_column():
+    df = cg.get_residual_load("DE", START, END, source="smard", use_cache=False)
+    assert_valid_df(df, expected_cols=["residual_load_mw"])
