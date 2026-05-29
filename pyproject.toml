@@ -48,7 +48,7 @@ dev = [
 clarigrid = "clarigrid.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/clarigrid/clarigrid"
+Homepage = "https://www.clarigrid.energy/python-sdk"
 Issues = "https://github.com/clarigrid/clarigrid/issues"
 
 [tool.ruff]
