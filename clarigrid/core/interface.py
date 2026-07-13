@@ -78,6 +78,20 @@ class DataProvider(ABC):
         """
         return {"*"}
 
+    def capability_zones(self) -> dict[str, set[str]]:
+        """Declare geographical coverage separately for each capability.
+
+        Providers whose datasets all share the same coverage can rely on this
+        default. Providers with asymmetric coverage (for example, prices for
+        bidding zones but generation for countries) should override it.
+
+        Returns:
+            Mapping from capability name to the zones supported by that
+            capability.
+        """
+        zones = self.zones()
+        return {capability: set(zones) for capability in self.capabilities()}
+
     def name(self) -> str:
         """Human-readable provider name."""
         return self.__class__.__name__

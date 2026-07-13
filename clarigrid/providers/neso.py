@@ -24,18 +24,88 @@ Notes:
 
 from __future__ import annotations
 
+import time
+
 import pandas as pd
 
 from clarigrid.core.http import get_json
 from clarigrid.core.interface import DataProvider
 from clarigrid.core.registry import register_provider
 from clarigrid.core.types import COLUMN_LOAD, STANDARD_TZ
-from clarigrid.utils.time import normalise_index
+from clarigrid.utils.time import normalise_index, parse_dt
 
 _CKAN = "https://api.neso.energy/api/3/action"
 
 # NESO Historic Demand Data package — one resource per calendar year.
 _DEMAND_PACKAGE = "historic-demand-data"
+
+_CARBON_API = "https://api.carbonintensity.org.uk"
+_CARBON_LICENSE = "CC BY 4.0"
+_CARBON_MAX_WINDOW = pd.Timedelta(days=14)
+_CARBON_CACHE_TTL_SECONDS = 60.0
+_CARBON_CACHE: dict[tuple[str, str, str], tuple[float, list[dict]]] = {}
+
+
+def _carbon_timestamp(value: str | pd.Timestamp) -> str:
+    return parse_dt(value).strftime("%Y-%m-%dT%H:%MZ")
+
+
+def _carbon_records(endpoint: str, start: str, end: str) -> list[dict]:
+    """Fetch Carbon Intensity API data in bounded 14-day chunks."""
+    cache_key = (endpoint, str(start), str(end))
+    cached = _CARBON_CACHE.get(cache_key)
+    if cached and time.monotonic() - cached[0] < _CARBON_CACHE_TTL_SECONDS:
+        return [dict(row) for row in cached[1]]
+
+    start_ts, end_ts = parse_dt(start), parse_dt(end)
+    cursor = start_ts
+    rows: list[dict] = []
+    while cursor <= end_ts:
+        chunk_end = min(cursor + _CARBON_MAX_WINDOW, end_ts)
+        payload = get_json(
+            f"{_CARBON_API}/{endpoint}/"
+            f"{_carbon_timestamp(cursor)}/{_carbon_timestamp(chunk_end)}"
+        )
+        rows.extend(payload.get("data", []))
+        if chunk_end >= end_ts:
+            break
+        cursor = chunk_end
+    filtered = []
+    for row in rows:
+        timestamp = pd.to_datetime(row.get("from"), utc=True, errors="coerce")
+        if pd.notna(timestamp) and start_ts <= timestamp < end_ts:
+            filtered.append(row)
+    _CARBON_CACHE[cache_key] = (time.monotonic(), filtered)
+    return [dict(row) for row in filtered]
+
+
+def _carbon_intensity_frame(records: list[dict], value: str) -> pd.DataFrame:
+    rows = []
+    for record in records:
+        intensity = record.get("intensity", {})
+        rows.append({
+            "utc_time": pd.to_datetime(record.get("from"), utc=True),
+            value: pd.to_numeric(intensity.get(value), errors="coerce"),
+        })
+    if not rows:
+        return pd.DataFrame(index=pd.DatetimeIndex([], tz="UTC", name="utc_time"))
+    frame = pd.DataFrame(rows).dropna(subset=["utc_time"]).set_index("utc_time")
+    frame = frame[~frame.index.duplicated(keep="last")].sort_index()
+    return normalise_index(frame)
+
+
+def _generation_share_frame(records: list[dict]) -> pd.DataFrame:
+    rows = []
+    for record in records:
+        row = {"utc_time": pd.to_datetime(record.get("from"), utc=True)}
+        for item in record.get("generationmix", []):
+            fuel = str(item.get("fuel", "")).lower().replace(" ", "_")
+            row[f"{fuel}_share_pct"] = pd.to_numeric(item.get("perc"), errors="coerce")
+        rows.append(row)
+    if not rows:
+        return pd.DataFrame(index=pd.DatetimeIndex([], tz="UTC", name="utc_time"))
+    frame = pd.DataFrame(rows).dropna(subset=["utc_time"]).set_index("utc_time")
+    return normalise_index(frame.sort_index())
 
 
 def _sp_to_utc(date_str: str, sp: int | str) -> pd.Timestamp:
@@ -171,11 +241,47 @@ class NesoProvider(DataProvider):
         })
         return normalise_index(df, STANDARD_TZ)
 
+    def get_co2_intensity(self, zone: str, start: str, end: str, **kwargs) -> pd.DataFrame:
+        frame = _carbon_intensity_frame(
+            _carbon_records("intensity", start, end), "actual"
+        ).rename(columns={"actual": "co2_consumption_g_kwh"})
+        frame.attrs.update({
+            "source_url": _CARBON_API,
+            "license": _CARBON_LICENSE,
+            "unit": "gCO2/kWh",
+        })
+        return frame
+
+    def get_co2_forecast(self, zone: str, start: str, end: str, **kwargs) -> pd.DataFrame:
+        frame = _carbon_intensity_frame(
+            _carbon_records("intensity", start, end), "forecast"
+        ).rename(columns={"forecast": "co2_forecast_g_kwh"})
+        frame.attrs.update({
+            "source_url": _CARBON_API,
+            "license": _CARBON_LICENSE,
+            "unit": "gCO2/kWh",
+        })
+        return frame
+
+    def get_generation_share(
+        self, zone: str, start: str, end: str, **kwargs
+    ) -> pd.DataFrame:
+        frame = _generation_share_frame(_carbon_records("generation", start, end))
+        frame.attrs.update({
+            "source_url": _CARBON_API,
+            "license": _CARBON_LICENSE,
+            "unit": "percent",
+        })
+        return frame
+
     def zones(self) -> set[str]:
         return {"GB"}
 
     def capabilities(self) -> set[str]:
-        return {"load", "generation"}
+        return {
+            "load", "generation", "co2_intensity", "co2_forecast",
+            "generation_share",
+        }
 
     def name(self) -> str:
         return "NESO Data Portal (Great Britain)"

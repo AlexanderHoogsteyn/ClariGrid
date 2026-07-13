@@ -85,6 +85,24 @@ class ZoneRouter:
 
         return new_count, overwritten
 
+    def register_coverage(
+        self,
+        provider_name: str,
+        coverage: dict[str, set[str]],
+    ) -> tuple[int, dict[str, str]]:
+        """Register a provider using per-capability zone coverage.
+
+        This is the preferred registration path. ``register`` remains public
+        for backward compatibility with external provider packages.
+        """
+        new_count = 0
+        overwritten: dict[str, str] = {}
+        for capability, zones in coverage.items():
+            added, replaced = self.register(provider_name, zones, {capability})
+            new_count += added
+            overwritten.update(replaced)
+        return new_count, overwritten
+
     # ------------------------------------------------------------------
     # Lookup
     # ------------------------------------------------------------------
@@ -115,8 +133,8 @@ class ZoneRouter:
         resolved = resolve_zone(zone).upper()
         suggestions: list[str] = []
         for name, p in _registry.items():
-            pzones = p.zones()
-            if capability not in p.capabilities():
+            pzones = p.capability_zones().get(capability, set())
+            if not pzones:
                 continue
             if _WILDCARD in pzones:
                 suggestions.append(name)

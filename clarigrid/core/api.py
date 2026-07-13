@@ -305,6 +305,64 @@ def get_gas_flows(
     return _session.apply_output_tz(df)
 
 
+def get_gas_storage(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    company: str | None = None,
+    facility: str | None = None,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch daily gas storage inventory, injection, and withdrawal data.
+
+    Energy inventory uses MWh, daily rates use MWh/day, and fill level uses
+    percent. ``company`` and ``facility`` are optional provider-specific EIC
+    filters; a facility filter requires its operator company EIC.
+    """
+    cache_key = f"gas_storage_{company or 'all'}_{facility or 'all'}"
+    return _fetch_capability(
+        zone, start, end,
+        capability="gas_storage",
+        method_name="get_gas_storage",
+        source=source,
+        use_cache=use_cache,
+        cache_key=cache_key,
+        company=company,
+        facility=facility,
+    )
+
+
+def get_lng_inventory(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    company: str | None = None,
+    facility: str | None = None,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch daily LNG tank inventory and terminal send-out data.
+
+    LNG inventory remains in thousand cubic metres; send-out rates are
+    converted to MWh/day. A composition-independent conversion from LNG
+    volume to energy is intentionally not applied.
+    """
+    cache_key = f"lng_inventory_{company or 'all'}_{facility or 'all'}"
+    return _fetch_capability(
+        zone, start, end,
+        capability="lng_inventory",
+        method_name="get_lng_inventory",
+        source=source,
+        use_cache=use_cache,
+        cache_key=cache_key,
+        company=company,
+        facility=facility,
+    )
+
+
 def get_weather(
     zone: str,
     start: str | pd.Timestamp,
@@ -515,6 +573,37 @@ def get_commercial_schedule(
     )
 
 
+def get_installed_capacity(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    time_step: str = "yearly",
+    installation_decommission: bool = False,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch installed generation capacity by technology.
+
+    Capacity is returned in MW. Energy storage volume columns use MWh.
+    ``time_step`` can be ``"yearly"`` or ``"monthly"`` where supported.
+    """
+    cache_key = (
+        f"installed_capacity_{time_step}_"
+        f"{'changes' if installation_decommission else 'total'}"
+    )
+    return _fetch_capability(
+        zone, start, end,
+        capability="installed_capacity",
+        method_name="get_installed_capacity",
+        source=source,
+        use_cache=use_cache,
+        cache_key=cache_key,
+        time_step=time_step,
+        installation_decommission=installation_decommission,
+    )
+
+
 def get_ntc(
     zone: str,
     start: str | pd.Timestamp,
@@ -565,6 +654,85 @@ def get_co2_intensity(
         capability="co2_intensity",
         method_name="get_co2_intensity",
         source=source, use_cache=use_cache,
+    )
+
+
+def get_co2_forecast(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch forecast electricity carbon intensity in gCO2/kWh."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="co2_forecast",
+        method_name="get_co2_forecast",
+        source=source,
+        use_cache=use_cache,
+    )
+
+
+def get_frequency(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch system frequency in Hz.
+
+    Provider-specific range limits apply because frequency data can have
+    sub-minute resolution.
+    """
+    return _fetch_capability(
+        zone, start, end,
+        capability="frequency",
+        method_name="get_frequency",
+        source=source,
+        use_cache=use_cache,
+    )
+
+
+def get_renewable_share(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch renewable share of load and/or generation in percent."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="renewable_share",
+        method_name="get_renewable_share",
+        source=source,
+        use_cache=use_cache,
+    )
+
+
+def get_generation_share(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch generation mix as fuel shares in percent.
+
+    This is distinct from :func:`get_generation`, whose values are MW.
+    """
+    return _fetch_capability(
+        zone, start, end,
+        capability="generation_share",
+        method_name="get_generation_share",
+        source=source,
+        use_cache=use_cache,
     )
 
 
