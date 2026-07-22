@@ -1,6 +1,6 @@
 # Clarigrid
 
-Unified Python SDK for European energy market data.
+Unified Python SDK for European and U.S. energy market data.
 
 [![PyPI](https://img.shields.io/pypi/v/clarigrid)](https://pypi.org/project/clarigrid/)
 [![Python](https://img.shields.io/pypi/pyversions/clarigrid)](https://pypi.org/project/clarigrid/)
@@ -11,7 +11,7 @@ Unified Python SDK for European energy market data.
 ## What it is
 
 Clarigrid provides a single, stable Python interface to access and normalise
-European energy market data from multiple sources.  All data comes back as
+European and U.S. energy market data from multiple sources. All data comes back as
 timezone-aware pandas DataFrames with consistent column names and units.
 
 Built-in free providers (no API key required) include **Energy-Charts**
@@ -19,6 +19,9 @@ Built-in free providers (no API key required) include **Energy-Charts**
 (GB), **Elexon/BMRS** (GB), and **ENTSOG** (EU gas).
 Fingrid (FI), GIE AGSI/ALSI (European gas), and TenneT (NL) are also built in
 and use free API keys.
+For the United States, CAISO OASIS and NYISO provide no-auth market and system
+data. EIA-930 provides nationwide hourly balancing-authority load, forecasts,
+fuel generation, and physical interchange with a free EIA key.
 
 ---
 
@@ -47,6 +50,9 @@ cg.connect("redata")  # ES load, generation, capacity and cross-border flows
 cg.connect("rte")  # FR load, generation, forecasts, exchanges and CO2
 cg.connect("fingrid")  # FI power, forecasts, flows, balancing and CO2 (free key)
 cg.connect("gie")  # European gas storage and LNG inventory (free key)
+cg.connect("eia")  # US balancing-authority load, generation and flows (free key)
+cg.connect("caiso")  # CAISO day-ahead hub prices (no key)
+cg.connect("nyiso")  # NYISO prices, load, forecasts and fuel mix (no key)
 
 # Optional: set output timezone (default is UTC).
 cg.set_timezone("Europe/Brussels")
@@ -56,6 +62,9 @@ prices = cg.get_prices("DE", "2025-01-01", "2025-01-07")  # → smard
 load   = cg.get_load("BE",   "2025-01-01", "2025-01-07")  # → elia
 gen    = cg.get_generation("GB", "2025-01-01", "2025-01-07")  # → elexon
 gas    = cg.get_gas_flows("BE-TSO-0001", "2025-01-01", "2025-01-07")  # → entsog
+us_load = cg.get_load("CAISO", "2025-01-01", "2025-01-07")  # → eia (CISO)
+np15 = cg.get_prices("CISO_NP15", "2025-01-01", "2025-01-07")  # → caiso
+nyc = cg.get_prices("NYISO_NYC", "2025-01-01", "2025-01-07")  # → nyiso
 ```
 
 ---
@@ -115,7 +124,8 @@ All functions return a `pandas.DataFrame` with:
 | Frequency | `frequency_hz` |
 | Renewable shares | `*_pct` |
 
-Price currency is stored in `df.attrs["currency"]` (``"EUR"`` or ``"GBP"``):
+Price currency is stored in `df.attrs["currency"]` (for example ``"EUR"``,
+``"GBP"``, or ``"USD"``):
 
 ```python
 df = cg.get_prices("DE", "2025-01-01", "2025-01-07")
@@ -123,8 +133,10 @@ print(df.columns)          # Index(['price_mwh'], dtype='object')
 print(df.attrs["currency"])  # 'EUR'
 ```
 
-Zone codes follow the ENTSO-E bidding zone convention (`BE`, `DE_LU`, `FR` …).
-Common aliases (`DE` → `DE_LU`, `GERMANY` → `DE_LU`) are resolved automatically.
+European zone codes follow the ENTSO-E bidding zone convention (`BE`, `DE_LU`,
+`FR` ...). U.S. electricity uses EIA/NERC balancing-authority codes (`CISO`,
+`ERCO`, `PJM`, `NYIS`) and explicit market hubs (`CISO_NP15`). Common aliases
+(`DE` → `DE_LU`, `CAISO` → `CISO`, `ERCOT` → `ERCO`) resolve automatically.
 
 ---
 
@@ -167,6 +179,7 @@ keys in `~/.clarigrid/keys.toml`:
 entsoe = "YOUR_ENTSOE_API_KEY"
 fingrid = "YOUR_FINGRID_API_KEY"
 gie = "YOUR_GIE_API_KEY"
+eia = "YOUR_EIA_API_KEY"
 ```
 
 Or set programmatically:
@@ -189,7 +202,7 @@ export CLARIGRID_ENTSOE_API_KEY=your_key
 |----------|-------------|
 | `cg.connect(provider)` | Connect provider, register in zone router |
 | `cg.set_timezone(tz)` | Set output timezone (IANA string, default `"UTC"`) |
-| `cg.get_prices(zone, start, end)` | Day-ahead prices → `price_mwh` |
+| `cg.get_prices(zone, start, end, market="day_ahead", node=None)` | Electricity prices → `price_mwh`; optional node for nodal markets |
 | `cg.get_load(zone, start, end)` | Actual total load → `load_mw` |
 | `cg.get_generation(zone, start, end)` | Generation per fuel type → `*_mw` columns |
 | `cg.get_generation_forecast(zone, start, end)` | Wind/solar generation forecast → `*_forecast_mw` |
@@ -224,6 +237,9 @@ All data functions accept:
 | `rte` | load, generation, load forecasts, physical/commercial exchanges, generation shares and CO2 | FR | None |
 | `fingrid` | load, generation, forecasts, flows, NTC, capacity, frequency, CO2, imbalance and balancing | FI | Free API key |
 | `gie` | daily underground gas storage and LNG terminal inventory | Europe, countries, facilities | Free API key |
+| `eia` | hourly load, forecast, fuel generation, physical interchange and generation shares | U.S. balancing authorities and regions | Free API key |
+| `caiso` | day-ahead LMP at NP15, SP15, ZP26 or an explicit node | California ISO | None |
+| `nyiso` | day-ahead zonal LBMP, actual/forecast load, fuel mix and shares | New York ISO and NYISO load zones | None |
 | `smard` | prices, load, generation | DE, AT, LU + TSO sub-zones | None |
 | `elia` | load, generation | BE | None |
 | `neso` | load, embedded generation, actual/forecast CO2, generation shares | GB | None |
@@ -256,6 +272,9 @@ clarigrid/
 │   ├── elia.py           # Elia Open Data (BE)
 │   ├── neso.py           # NESO Data Portal (GB)
 │   ├── elexon.py         # Elexon BMRS (GB)
+│   ├── eia.py            # EIA-930 balancing-authority operations (US)
+│   ├── caiso.py          # CAISO OASIS day-ahead prices (US)
+│   ├── nyiso.py          # NYISO prices, load, forecasts and fuel mix (US)
 │   └── entsog.py         # ENTSOG Transparency Platform (EU gas)
 └── utils/
     ├── time.py           # parse_dt, normalise_index

@@ -35,6 +35,7 @@ COL_GAS_CAP  = "capacity_kwh_d"
 # ── Price column → currency map ────────────────────────────────────────────
 # Maps provider-specific column names to their ISO currency code.
 _PRICE_COL_MAP: dict[str, str] = {
+    "price_usd_mwh": "USD",
     "price_gbp_mwh": "GBP",
     "price_eur_mwh": "EUR",
     "price_mwh":     "EUR",   # already canonical; assume EUR if unset
@@ -46,8 +47,8 @@ _PRICE_COL_MAP: dict[str, str] = {
 def normalise_prices(df: pd.DataFrame) -> pd.DataFrame:
     """Rename any recognised price column to ``price_mwh``.
 
-    Sets ``df.attrs["currency"]`` to the ISO currency code (``"EUR"`` or
-    ``"GBP"``).  Leaves the DataFrame untouched if no known price column
+    Sets ``df.attrs["currency"]`` to the ISO currency code. Leaves the
+    DataFrame untouched if no known price column
     is found.
     """
     if df.empty:

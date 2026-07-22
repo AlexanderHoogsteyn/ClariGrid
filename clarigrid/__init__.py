@@ -1,17 +1,16 @@
-"""Clarigrid — unified European energy market data SDK."""
+"""Clarigrid — unified European and U.S. energy market data SDK."""
 
 # Auto-register all built-in free providers FIRST (no API key required).
 # Must import before defining conflicting names in this namespace.
 import clarigrid.providers  # noqa: E402, F401
-
 from clarigrid.core import cache  # exposed as cg.cache
 from clarigrid.core.api import (
     configure,
     connect,
     get_balancing_prices,
     get_balancing_volumes,
-    get_co2_intensity,
     get_co2_forecast,
+    get_co2_intensity,
     get_commercial_schedule,
     get_frequency,
     get_gas_flows,
@@ -21,15 +20,15 @@ from clarigrid.core.api import (
     get_generation_share,
     get_imbalance_prices,
     get_installed_capacity,
+    get_lng_inventory,
     get_load,
     get_load_forecast,
-    get_lng_inventory,
     get_net_position,
     get_ntc,
     get_physical_flows,
     get_prices,
-    get_residual_load,
     get_renewable_share,
+    get_residual_load,
     get_system_imbalance,
     get_weather,
     list_providers,

@@ -15,6 +15,9 @@ All returned DataFrames have:
 
 from __future__ import annotations
 
+import hashlib
+import json
+
 import pandas as pd
 
 from clarigrid.core import cache as _cache
@@ -101,6 +104,16 @@ def _resolve_provider(
     return _session.resolve(zone, capability)
 
 
+def _variant_cache_key(dataset: str, **values: object) -> str:
+    """Return a stable cache dataset key for optional query dimensions."""
+    relevant = {key: value for key, value in values.items() if value is not None}
+    if not relevant:
+        return dataset
+    encoded = json.dumps(relevant, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(encoded.encode()).hexdigest()[:12]
+    return f"{dataset}_{digest}"
+
+
 def _fetch_capability(
     zone: str,
     start: str | pd.Timestamp,
@@ -150,6 +163,8 @@ def get_prices(
     start: str | pd.Timestamp,
     end: str | pd.Timestamp,
     *,
+    market: str = "day_ahead",
+    node: str | None = None,
     source: str | None = None,
     use_cache: bool = True,
 ) -> pd.DataFrame:
@@ -159,6 +174,10 @@ def get_prices(
         zone: Bidding zone code (``"BE"``, ``"DE"``, ``"FR"`` …).
         start: Start date (inclusive).
         end: End date (inclusive).
+        market: Market interval. ``"day_ahead"`` is the interoperable
+            default; provider support for other values varies.
+        node: Optional nodal price location. Most European providers ignore
+            this; nodal providers such as CAISO use it.
         source: Override provider; defaults to the router-selected provider
             for this zone.
         use_cache: Read from / write to local Parquet cache.
@@ -172,17 +191,24 @@ def get_prices(
     validate_date_range(start, end)
     provider_name, provider = _resolve_provider(zone, "prices", source)
 
+    cache_key = _variant_cache_key(
+        "prices",
+        market=None if market == "day_ahead" else market,
+        node=node,
+    )
     if use_cache:
-        cached = _cache.load(provider_name, "prices", zone, start, end)
+        cached = _cache.load(provider_name, cache_key, zone, start, end)
         if cached is not None:
             return _session.apply_output_tz(cached)
 
-    df = provider.get_prices(zone=zone, start=start, end=end)
+    df = provider.get_prices(
+        zone=zone, start=start, end=end, market=market, node=node
+    )
     df = _norm.normalise_prices(df)
     _stamp(df, provider_name, "prices", zone)
 
     if use_cache:
-        _cache.save(df, provider_name, "prices", zone, start, end)
+        _cache.save(df, provider_name, cache_key, zone, start, end)
     return _session.apply_output_tz(df)
 
 
