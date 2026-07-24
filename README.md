@@ -22,6 +22,8 @@ and use free API keys.
 For the United States, CAISO OASIS and NYISO provide no-auth market and system
 data. EIA-930 provides nationwide hourly balancing-authority load, forecasts,
 fuel generation, and physical interchange with a free EIA key.
+Global historical meteorology and solar data are available from NASA POWER
+without an API key.
 
 ---
 
@@ -53,6 +55,7 @@ cg.connect("gie")  # European gas storage and LNG inventory (free key)
 cg.connect("eia")  # US balancing-authority load, generation and flows (free key)
 cg.connect("caiso")  # CAISO day-ahead hub prices (no key)
 cg.connect("nyiso")  # NYISO prices, load, forecasts and fuel mix (no key)
+cg.connect("nasapower")  # Global daily/hourly weather and solar data (no key)
 
 # Optional: set output timezone (default is UTC).
 cg.set_timezone("Europe/Brussels")
@@ -65,6 +68,12 @@ gas    = cg.get_gas_flows("BE-TSO-0001", "2025-01-01", "2025-01-07")  # → ents
 us_load = cg.get_load("CAISO", "2025-01-01", "2025-01-07")  # → eia (CISO)
 np15 = cg.get_prices("CISO_NP15", "2025-01-01", "2025-01-07")  # → caiso
 nyc = cg.get_prices("NYISO_NYC", "2025-01-01", "2025-01-07")  # → nyiso
+weather = cg.get_weather(
+    "40.7128,-74.0060",
+    "2025-01-01",
+    "2025-01-07",
+    source="nasapower",
+)
 ```
 
 ---
@@ -240,6 +249,7 @@ All data functions accept:
 | `eia` | hourly load, forecast, fuel generation, physical interchange and generation shares | U.S. balancing authorities and regions | Free API key |
 | `caiso` | day-ahead LMP at NP15, SP15, ZP26 or an explicit node | California ISO | None |
 | `nyiso` | day-ahead zonal LBMP, actual/forecast load, fuel mix and shares | New York ISO and NYISO load zones | None |
+| `nasapower` | daily/hourly meteorology, precipitation, wind and solar radiation | Global point locations (`lat,lon`) | None |
 | `smard` | prices, load, generation | DE, AT, LU + TSO sub-zones | None |
 | `elia` | load, generation | BE | None |
 | `neso` | load, embedded generation, actual/forecast CO2, generation shares | GB | None |
@@ -275,6 +285,7 @@ clarigrid/
 │   ├── eia.py            # EIA-930 balancing-authority operations (US)
 │   ├── caiso.py          # CAISO OASIS day-ahead prices (US)
 │   ├── nyiso.py          # NYISO prices, load, forecasts and fuel mix (US)
+│   ├── nasapower.py      # NASA POWER meteorology and solar data (global)
 │   └── entsog.py         # ENTSOG Transparency Platform (EU gas)
 └── utils/
     ├── time.py           # parse_dt, normalise_index

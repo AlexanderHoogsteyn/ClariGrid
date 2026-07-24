@@ -109,7 +109,7 @@ def _variant_cache_key(dataset: str, **values: object) -> str:
     relevant = {key: value for key, value in values.items() if value is not None}
     if not relevant:
         return dataset
-    encoded = json.dumps(relevant, sort_keys=True, separators=(",", ":"))
+    encoded = json.dumps(relevant, sort_keys=True, separators=(",", ":"), default=str)
     digest = hashlib.sha256(encoded.encode()).hexdigest()[:12]
     return f"{dataset}_{digest}"
 
@@ -406,8 +406,8 @@ def get_weather(
         start: Start date (inclusive).
         end: End date (inclusive).
         source: Override provider name.
-        use_cache: Use local Parquet cache.  Note: cache key does not encode
-            ``**kwargs`` — set ``use_cache=False`` when varying variables.
+        use_cache: Use the local Parquet cache. Provider options and requested
+            variables are included in the cache key.
         **kwargs: Passed through to the provider (e.g. ``variables``).
 
     Returns:
@@ -424,15 +424,16 @@ def get_weather(
             "Connect a weather provider first, e.g. cg.connect('openmeteo')."
         )
 
+    cache_key = _variant_cache_key("weather", **kwargs)
     if use_cache:
-        cached = _cache.load(provider_name, "weather", zone, start, end)
+        cached = _cache.load(provider_name, cache_key, zone, start, end)
         if cached is not None:
             return _session.apply_output_tz(cached)
 
     df = provider.get_weather(zone=zone, start=start, end=end, **kwargs)
 
     if use_cache:
-        _cache.save(df, provider_name, "weather", zone, start, end)
+        _cache.save(df, provider_name, cache_key, zone, start, end)
     return _session.apply_output_tz(df)
 
 
