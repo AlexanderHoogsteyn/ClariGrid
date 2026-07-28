@@ -6,17 +6,28 @@ Routing logic:
 - When ``source=`` is given, the named provider is used directly (bypasses
   the router).
 
-All returned DataFrames have:
+All returned DataFrames (``EnergyFrame``) have:
 - ``DatetimeIndex`` named ``utc_time``, converted to the output timezone set
   via ``cg.set_timezone()``.
 - Canonical column names (``price_mwh``, ``load_mw``, ``*_mw`` for generation).
 - ``df.attrs["currency"]`` on price DataFrames (``"EUR"`` or ``"GBP"``).
+- Provenance: ``df.attrs["provider"]``, ``df.attrs["zone"]``,
+  ``df.attrs["dataset"]``, ``df.attrs["fetched_at"]``.
+
+Capability registry
+-------------------
+``_CAPABILITIES`` maps capability name → ``_CapabilitySpec``.  Adding a new
+capability (e.g. ``"curtailment"``) means touching **one place**: add a row
+here, add the abstract method on the interface, implement in providers, and
+optionally add a public wrapper function.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
+from dataclasses import dataclass
 
 import pandas as pd
 
@@ -24,22 +35,118 @@ from clarigrid.core import cache as _cache
 from clarigrid.core import config as _config
 from clarigrid.core import normalise as _norm
 from clarigrid.core import session as _session
+from clarigrid.core.normalise import EnergyFrame
 from clarigrid.core.registry import register_provider  # noqa: F401 — re-exported
 from clarigrid.utils.validation import resolve_zone, validate_date_range
 
+# ── Capability registry ────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class _CapabilitySpec:
+    """Maps a capability string to a provider method name and normaliser."""
+
+    provider_method: str
+    normalise: Callable[[pd.DataFrame], EnergyFrame] | None = None
+
+
+_CAPABILITIES: dict[str, _CapabilitySpec] = {
+    "prices":     _CapabilitySpec("get_prices",     _norm.normalise_prices),
+    "load":       _CapabilitySpec("get_load",       _norm.normalise_load),
+    "generation": _CapabilitySpec("get_generation", _norm.normalise_generation),
+    "weather":    _CapabilitySpec("get_weather",    None),
+    "gas_flows":  _CapabilitySpec("get_gas_flows",  None),
+    "capacity":   _CapabilitySpec("get_capacity",   None),
+}
+
+
+# ── Internal helpers ───────────────────────────────────────────────────────
 
 def _stamp(
     df: pd.DataFrame,
     provider_name: str,
     dataset: str,
     zone: str,
-) -> pd.DataFrame:
-    """Attach provenance metadata to df.attrs (non-destructive)."""
-    df.attrs["provider"] = provider_name
-    df.attrs["dataset"] = dataset
-    df.attrs["zone"] = zone
-    df.attrs["fetched_at"] = pd.Timestamp.now(tz="UTC").isoformat()
-    return df
+) -> EnergyFrame:
+    """Wrap *df* in EnergyFrame and attach provenance metadata."""
+    if not isinstance(df, EnergyFrame):
+        ef = EnergyFrame(df)
+        # Migrate any existing attrs so currency etc. survive.
+        if df.attrs:
+            ef._set_meta(**{k: v for k, v in df.attrs.items()
+                            if isinstance(v, (str, int, float, bool))})
+    else:
+        ef = df
+    ef._set_meta(
+        provider=provider_name,
+        dataset=dataset,
+        zone=zone,
+        fetched_at=pd.Timestamp.now(tz="UTC").isoformat(),
+    )
+    return ef
+
+
+def _resolve_provider(
+    zone: str,
+    capability: str,
+    source: str | None,
+) -> tuple[str, object]:
+    """Return ``(provider_name, provider)`` for a data request."""
+    if source is not None:
+        from clarigrid.core.registry import _registry, list_providers
+        if source not in _registry:
+            raise KeyError(
+                f"Provider '{source}' not registered.  "
+                f"Available: {list_providers()}"
+            )
+        return source, _registry[source]
+    return _session.resolve(zone, capability)
+
+
+def _fetch_and_normalise(
+    capability: str,
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    provider_name: str,
+    provider: object,
+    use_cache: bool,
+    cache_dataset: str | None = None,
+    **provider_kwargs,
+) -> EnergyFrame:
+    """Shared fetch/cache/normalise/stamp logic for all capabilities.
+
+    Args:
+        capability: Key in ``_CAPABILITIES`` (e.g. ``"prices"``).
+        zone: Already alias-resolved zone string.
+        start: Start date.
+        end: End date.
+        provider_name: Resolved provider name (for cache keying + metadata).
+        provider: Provider instance.
+        use_cache: Whether to read from / write to the local cache.
+        cache_dataset: Override cache dataset key (defaults to ``capability``).
+        **provider_kwargs: Extra kwargs forwarded to the provider method.
+    """
+    spec = _CAPABILITIES[capability]
+    cd = cache_dataset or capability
+
+    if use_cache:
+        cached = _cache.load(provider_name, cd, zone, start, end)
+        if cached is not None:
+            if spec.normalise is not None:
+                cached = spec.normalise(cached)
+            return _session.apply_output_tz(_stamp(cached, provider_name, capability, zone))
+
+    method = getattr(provider, spec.provider_method)
+    df = method(zone=zone, start=start, end=end, **provider_kwargs)
+
+    if spec.normalise is not None:
+        df = spec.normalise(df)
+    df = _stamp(df, provider_name, capability, zone)
+
+    if use_cache:
+        _cache.save(df, provider_name, cd, zone, start, end)
+
+    return _session.apply_output_tz(df)
 
 
 # ── Connection & timezone ──────────────────────────────────────────────────
@@ -56,12 +163,32 @@ def connect(provider: str) -> None:
         Connected to Elia Open Data (Belgium) — 2 new table(s).
 
     Args:
-        provider: Registered provider name (e.g. ``"smard"``, ``"elia"``).
+        provider: Registered provider name (e.g. ``"smard"``, ``"elia"``,
+            ``"entsoe"``).
 
     Raises:
         KeyError: Provider not registered.
+        ConfigurationError: Key-required provider, non-interactive, no key found.
+        InvalidKeyError: Key found but rejected by the upstream API.
     """
+    from clarigrid._auth import ensure_authenticated
+    ensure_authenticated(provider)
     _session.connect(provider)
+
+
+def reset() -> None:
+    """Reset all session state to defaults.
+
+    Disconnects all providers, clears the zone router, and resets the output
+    timezone to UTC.  Useful in tests and scripts that need a clean slate::
+
+        import clarigrid as cg
+        cg.reset()
+
+    After calling ``reset()``, providers must be reconnected with
+    ``cg.connect()`` before data can be fetched.
+    """
+    _session.reset()
 
 
 def set_timezone(tz: str) -> None:
@@ -86,23 +213,6 @@ def set_timezone(tz: str) -> None:
 
 
 # ── Data retrieval helpers ─────────────────────────────────────────────────
-
-def _resolve_provider(
-    zone: str,
-    capability: str,
-    source: str | None,
-) -> tuple[str, object]:
-    """Return ``(provider_name, provider)`` for a data request."""
-    if source is not None:
-        from clarigrid.core.registry import _registry, list_providers
-        if source not in _registry:
-            raise KeyError(
-                f"Provider '{source}' not registered.  "
-                f"Available: {list_providers()}"
-            )
-        return source, _registry[source]
-    return _session.resolve(zone, capability)
-
 
 def _variant_cache_key(dataset: str, **values: object) -> str:
     """Return a stable cache dataset key for optional query dimensions."""
@@ -149,7 +259,7 @@ def _fetch_capability(
             return _session.apply_output_tz(cached)
 
     df = method(zone=zone, start=start, end=end, **kwargs)
-    _stamp(df, provider_name, capability, zone)
+    df = _stamp(df, provider_name, capability, zone)
 
     if use_cache:
         _cache.save(df, provider_name, ck, zone, start, end)
@@ -167,7 +277,7 @@ def get_prices(
     node: str | None = None,
     source: str | None = None,
     use_cache: bool = True,
-) -> pd.DataFrame:
+) -> EnergyFrame:
     """Fetch day-ahead electricity prices.
 
     Args:
@@ -183,8 +293,8 @@ def get_prices(
         use_cache: Read from / write to local Parquet cache.
 
     Returns:
-        DataFrame with ``DatetimeIndex`` (``utc_time``, output timezone) and
-        column ``price_mwh``.  ``df.attrs["currency"]`` holds the ISO
+        ``EnergyFrame`` with ``DatetimeIndex`` (``utc_time``, output timezone)
+        and column ``price_mwh``.  ``df.attrs["currency"]`` holds the ISO
         currency code (``"EUR"`` for SMARD; ``"GBP"`` for Elexon).
     """
     zone = resolve_zone(zone)
@@ -196,20 +306,18 @@ def get_prices(
         market=None if market == "day_ahead" else market,
         node=node,
     )
-    if use_cache:
-        cached = _cache.load(provider_name, cache_key, zone, start, end)
-        if cached is not None:
-            return _session.apply_output_tz(cached)
-
-    df = provider.get_prices(
-        zone=zone, start=start, end=end, market=market, node=node
+    return _fetch_and_normalise(
+        "prices",
+        zone,
+        start,
+        end,
+        provider_name,
+        provider,
+        use_cache,
+        cache_dataset=cache_key,
+        market=market,
+        node=node,
     )
-    df = _norm.normalise_prices(df)
-    _stamp(df, provider_name, "prices", zone)
-
-    if use_cache:
-        _cache.save(df, provider_name, cache_key, zone, start, end)
-    return _session.apply_output_tz(df)
 
 
 def get_load(
@@ -219,29 +327,19 @@ def get_load(
     *,
     source: str | None = None,
     use_cache: bool = True,
-) -> pd.DataFrame:
+) -> EnergyFrame:
     """Fetch actual total load.
 
     Returns:
-        DataFrame with ``DatetimeIndex`` (``utc_time``, output timezone) and
-        column ``load_mw``.
+        ``EnergyFrame`` with ``DatetimeIndex`` (``utc_time``, output timezone)
+        and column ``load_mw``.
     """
     zone = resolve_zone(zone)
     validate_date_range(start, end)
     provider_name, provider = _resolve_provider(zone, "load", source)
-
-    if use_cache:
-        cached = _cache.load(provider_name, "load", zone, start, end)
-        if cached is not None:
-            return _session.apply_output_tz(cached)
-
-    df = provider.get_load(zone=zone, start=start, end=end)
-    df = _norm.normalise_load(df)
-    _stamp(df, provider_name, "load", zone)
-
-    if use_cache:
-        _cache.save(df, provider_name, "load", zone, start, end)
-    return _session.apply_output_tz(df)
+    return _fetch_and_normalise(
+        "load", zone, start, end, provider_name, provider, use_cache
+    )
 
 
 def get_generation(
@@ -251,30 +349,20 @@ def get_generation(
     *,
     source: str | None = None,
     use_cache: bool = True,
-) -> pd.DataFrame:
+) -> EnergyFrame:
     """Fetch actual generation per source.
 
     Returns:
-        DataFrame with ``DatetimeIndex`` (``utc_time``, output timezone).
+        ``EnergyFrame`` with ``DatetimeIndex`` (``utc_time``, output timezone).
         Columns are generation fuel types in MW, e.g. ``solar_mw``,
         ``wind_onshore_mw``, ``nuclear_mw``.
     """
     zone = resolve_zone(zone)
     validate_date_range(start, end)
     provider_name, provider = _resolve_provider(zone, "generation", source)
-
-    if use_cache:
-        cached = _cache.load(provider_name, "generation", zone, start, end)
-        if cached is not None:
-            return _session.apply_output_tz(cached)
-
-    df = provider.get_generation(zone=zone, start=start, end=end)
-    df = _norm.normalise_generation(df)
-    _stamp(df, provider_name, "generation", zone)
-
-    if use_cache:
-        _cache.save(df, provider_name, "generation", zone, start, end)
-    return _session.apply_output_tz(df)
+    return _fetch_and_normalise(
+        "generation", zone, start, end, provider_name, provider, use_cache
+    )
 
 
 def get_gas_flows(
@@ -286,8 +374,8 @@ def get_gas_flows(
     period_type: str = "day",
     source: str | None = None,
     use_cache: bool = True,
-) -> pd.DataFrame:
-    """Fetch gas physical flows or capacity data.
+) -> EnergyFrame:
+    """Fetch gas physical flows or nominations.
 
     Args:
         zone: Operator key (``"BE-TSO-0001"``), country code (``"BE"``),
@@ -301,7 +389,7 @@ def get_gas_flows(
         use_cache: Use local cache.
 
     Returns:
-        DataFrame with ``DatetimeIndex`` and columns ``flow_kwh_d``,
+        ``EnergyFrame`` with ``DatetimeIndex`` and columns ``flow_kwh_d``,
         ``direction``, ``point_key``, ``operator_key``.
     """
     validate_date_range(start, end)
@@ -313,22 +401,53 @@ def get_gas_flows(
             f"Provider '{provider_name}' does not support gas flows. "
             "Call cg.connect('entsog') first."
         )
-    cache_key = f"gas_{indicator.replace(' ', '_')}_{period_type}"
-
-    if use_cache:
-        cached = _cache.load(provider_name, cache_key, zone, start, end)
-        if cached is not None:
-            return _session.apply_output_tz(cached)
-
-    df = provider.get_gas_flows(
-        zone=zone, start=start, end=end,
+    cache_dataset = f"gas_{indicator.replace(' ', '_')}_{period_type}"
+    return _fetch_and_normalise(
+        "gas_flows", zone, start, end, provider_name, provider, use_cache,
+        cache_dataset=cache_dataset,
         indicator=indicator, period_type=period_type,
     )
-    _stamp(df, provider_name, "gas_flows", zone)
 
-    if use_cache:
-        _cache.save(df, provider_name, cache_key, zone, start, end)
-    return _session.apply_output_tz(df)
+
+def get_capacity(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    period_type: str = "day",
+    source: str | None = None,
+    use_cache: bool = True,
+) -> EnergyFrame:
+    """Fetch firm technical gas transmission capacity.
+
+    Args:
+        zone: Operator key (``"BE-TSO-0001"``), country code (``"BE"``),
+            or interconnection point key.
+        start: Start date (inclusive).
+        end: End date (inclusive).
+        period_type: Granularity — ``"hour"``, ``"day"``, ``"month"``.
+        source: Override provider name.
+        use_cache: Use local cache.
+
+    Returns:
+        ``EnergyFrame`` with ``DatetimeIndex`` and columns ``capacity_kwh_d``,
+        ``direction``, ``point_key``, ``operator_key``.
+    """
+    validate_date_range(start, end)
+    from clarigrid.core.interface import GasDataProvider
+
+    provider_name, provider = _resolve_provider(zone, "capacity", source)
+    if not isinstance(provider, GasDataProvider):
+        raise TypeError(
+            f"Provider '{provider_name}' does not support capacity data. "
+            "Call cg.connect('entsog') first."
+        )
+    cache_dataset = f"capacity_{period_type}"
+    return _fetch_and_normalise(
+        "capacity", zone, start, end, provider_name, provider, use_cache,
+        cache_dataset=cache_dataset,
+        period_type=period_type,
+    )
 
 
 def get_gas_storage(
@@ -397,7 +516,7 @@ def get_weather(
     source: str | None = None,
     use_cache: bool = True,
     **kwargs,
-) -> pd.DataFrame:
+) -> EnergyFrame:
     """Fetch weather observations or forecast data.
 
     Args:
@@ -411,7 +530,7 @@ def get_weather(
         **kwargs: Passed through to the provider (e.g. ``variables``).
 
     Returns:
-        DataFrame with ``DatetimeIndex``.  Columns depend on requested
+        ``EnergyFrame`` with ``DatetimeIndex``.  Columns depend on requested
         variables.
     """
     validate_date_range(start, end)
@@ -423,18 +542,12 @@ def get_weather(
             f"Provider '{provider_name}' does not support weather data. "
             "Connect a weather provider first, e.g. cg.connect('openmeteo')."
         )
-
     cache_key = _variant_cache_key("weather", **kwargs)
-    if use_cache:
-        cached = _cache.load(provider_name, cache_key, zone, start, end)
-        if cached is not None:
-            return _session.apply_output_tz(cached)
-
-    df = provider.get_weather(zone=zone, start=start, end=end, **kwargs)
-
-    if use_cache:
-        _cache.save(df, provider_name, cache_key, zone, start, end)
-    return _session.apply_output_tz(df)
+    return _fetch_and_normalise(
+        "weather", zone, start, end, provider_name, provider, use_cache,
+        cache_dataset=cache_key,
+        **kwargs,
+    )
 
 
 # ── Forecasts ───────────────────────────────────────────────────────────────
@@ -815,7 +928,7 @@ def configure(path: str | None = None) -> None:
 
 
 def set_api_key(provider: str, key: str) -> None:
-    """Store an API key for a provider in ``~/.clarigrid/keys.toml``."""
+    """Store an API key for a provider in ``~/.config/clarigrid/.env``."""
     _config.set_api_key(provider, key)
 
 

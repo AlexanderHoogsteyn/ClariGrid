@@ -24,6 +24,8 @@ data. EIA-930 provides nationwide hourly balancing-authority load, forecasts,
 fuel generation, and physical interchange with a free EIA key.
 Global historical meteorology and solar data are available from NASA POWER
 without an API key.
+ENTSO-E and other key-protected sources can be configured as described in
+[API key setup](#api-key-setup) below.
 
 ---
 
@@ -33,6 +35,12 @@ without an API key.
 pip install clarigrid
 ```
 
+For the interactive setup wizard and CLI tools:
+
+```bash
+pip install clarigrid[auth]
+```
+
 ---
 
 ## Quick start
@@ -40,7 +48,7 @@ pip install clarigrid
 ```python
 import clarigrid as cg
 
-# Connect one or more providers — each call adds coverage.
+# Free providers — no key required.
 cg.connect("smard")   # DE prices, load, generation
 cg.connect("elia")    # BE load, generation
 cg.connect("neso")    # GB load, embedded generation
@@ -78,13 +86,76 @@ weather = cg.get_weather(
 
 ---
 
+## API key setup
+
+Some providers (ENTSO-E, TenneT) require a personal API key issued by
+the upstream data source.  Clarigrid supports two ways to supply these keys.
+
+### Option 1 — ClarigGrid account (recommended)
+
+Store all your provider keys in one place at
+[clarigrid.energy/saved](https://clarigrid.energy/saved).  The SDK then
+fetches them automatically using a single **ClarigGrid API key**.
+
+**First-time setup (interactive):**
+
+```python
+import clarigrid as cg
+cg.connect("entsoe")
+# Opens browser → log in at clarigrid.energy → keys fetched automatically.
+```
+
+Or use the CLI:
+
+```bash
+clarigrid setup          # guided wizard for all providers
+clarigrid connect entsoe # authenticate a single provider
+```
+
+**Headless / CI environments:**  set one environment variable and no
+browser is ever needed:
+
+```bash
+export CLARIGRID_API_KEY=your-clarigrid-uuid
+```
+
+The SDK uses `CLARIGRID_API_KEY` to fetch all your stored provider keys
+from clarigrid.energy on the first `connect()` call of each session.
+
+**How to get a `CLARIGRID_API_KEY`:**
+
+1. Log in at [clarigrid.energy](https://clarigrid.energy)
+2. Add your provider API keys at [clarigrid.energy/saved](https://clarigrid.energy/saved)
+3. Run `cg.connect("entsoe")` once in an interactive terminal — the browser
+   flow logs you in and stores your `CLARIGRID_API_KEY` locally.
+
+---
+
+### Option 2 — Manual key entry (no account needed)
+
+If you prefer not to use a clarigrid.energy account, set provider keys
+directly. Keys are stored in `~/.config/clarigrid/.env` (permissions: 600).
+
+**Environment variable** (recommended for CI):
+
+```bash
+export ENTSOE_API_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+export TENNET_API_KEY=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+**Config file** — add to `~/.config/clarigrid/.env`:
+
+```
+ENTSOE_API_KEY="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+TENNET_API_KEY="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+```
+
 ## Zone routing
 
 Each call to `cg.connect()` registers a provider and its capability-specific
 zone coverage in
 an internal router.  When you call `get_prices("DE")`, the router picks the
-best connected provider for that zone and dataset automatically — no need to
-re-specify the provider on every call.
+best connected provider for that zone and dataset automatically.
 
 Multiple `connect()` calls accumulate coverage.  If two providers both cover
 the same zone/dataset pair, the **later** `connect()` call wins.
@@ -102,7 +173,7 @@ If no connected provider covers the requested zone/dataset, a helpful error
 is raised:
 
 ```
-ValueError: No connected provider has 'prices' data for zone 'BE'.
+ZoneNotCoveredError: No connected provider has 'prices' data for zone 'BE'.
   Consider: cg.connect('entsoe')
 ```
 
@@ -119,7 +190,7 @@ df = cg.get_load("GB", "2025-01-01", "2025-01-07", source="neso")
 All functions return a `pandas.DataFrame` with:
 
 | Property | Value |
-|----------|-------|
+|---|---|
 | Index | `DatetimeIndex` named `utc_time`, tz-aware |
 | Timezone | UTC by default; change with `cg.set_timezone()` |
 | Price column | `price_mwh` |
@@ -138,7 +209,6 @@ Price currency is stored in `df.attrs["currency"]` (for example ``"EUR"``,
 
 ```python
 df = cg.get_prices("DE", "2025-01-01", "2025-01-07")
-print(df.columns)          # Index(['price_mwh'], dtype='object')
 print(df.attrs["currency"])  # 'EUR'
 ```
 
@@ -159,48 +229,45 @@ df = cg.get_load("BE", "2025-01-01", "2025-01-07")
 # df.index is tz-aware in Europe/Brussels
 ```
 
-Data is always fetched and cached as UTC.  The timezone conversion is applied
+Data is always fetched and cached as UTC.  Timezone conversion is applied
 at the output boundary only.
 
 ---
 
 ## Caching
 
-Responses are cached locally at `~/.clarigrid/cache/` as Parquet files, keyed
-by provider + dataset + zone + date range.  Disable per call with
-`use_cache=False`.
+Responses are cached locally at `~/.clarigrid/cache/` as Parquet files
+(requires `pip install clarigrid[cache]`), keyed by provider + dataset +
+zone + date range.  Historical data is cached indefinitely; live data
+expires after 1 hour by default.
 
 ```python
 from clarigrid.core import cache
-cache.clear()           # clear all
-cache.clear("smard")    # clear one provider
+
+cache.info()           # DataFrame showing cached entries
+cache.clear()          # clear all
+cache.clear("smard")   # clear one provider
+cache.set_live_ttl(1800)  # change live-data TTL to 30 min
+```
+
+Disable caching per call:
+
+```python
+df = cg.get_prices("DE", "2025-01-01", "2025-01-07", use_cache=False)
 ```
 
 ---
 
-## API key providers
+## CLI reference
 
-Providers that require an API key (e.g. ENTSO-E or Fingrid) store
-keys in `~/.clarigrid/keys.toml`:
-
-```toml
-[keys]
-entsoe = "YOUR_ENTSOE_API_KEY"
-fingrid = "YOUR_FINGRID_API_KEY"
-gie = "YOUR_GIE_API_KEY"
-eia = "YOUR_EIA_API_KEY"
-```
-
-Or set programmatically:
-
-```python
-cg.set_api_key("entsoe", "YOUR_KEY")
-```
-
-Or via environment variable:
+Requires `pip install clarigrid[auth]`.
 
 ```bash
-export CLARIGRID_ENTSOE_API_KEY=your_key
+clarigrid setup                    # guided wizard — configure all providers
+clarigrid connect <source>         # authenticate a single provider
+clarigrid auth --show              # list configured sources (keys masked)
+clarigrid auth --clear <source>    # remove key for a specific source
+clarigrid auth --clear --all       # remove all stored keys
 ```
 
 ---
@@ -208,8 +275,8 @@ export CLARIGRID_ENTSOE_API_KEY=your_key
 ## API reference
 
 | Function | Description |
-|----------|-------------|
-| `cg.connect(provider)` | Connect provider, register in zone router |
+|---|---|
+| `cg.connect(provider)` | Connect provider; handles auth for key-guarded sources |
 | `cg.set_timezone(tz)` | Set output timezone (IANA string, default `"UTC"`) |
 | `cg.get_prices(zone, start, end, market="day_ahead", node=None)` | Electricity prices → `price_mwh`; optional node for nodal markets |
 | `cg.get_load(zone, start, end)` | Actual total load → `load_mw` |
@@ -224,9 +291,12 @@ export CLARIGRID_ENTSOE_API_KEY=your_key
 | `cg.get_co2_intensity(zone, start, end)` | Electricity carbon intensity in gCO2/kWh |
 | `cg.get_co2_forecast(zone, start, end)` | Forecast carbon intensity in gCO2/kWh |
 | `cg.get_gas_flows(zone, start, end)` | Gas physical flows → `flow_kwh_d` |
+| `cg.get_capacity(zone, start, end)` | Firm technical gas capacity → `capacity_kwh_d` |
 | `cg.get_gas_storage(zone, start, end)` | Gas inventory, capacity, injection and withdrawal |
 | `cg.get_lng_inventory(zone, start, end)` | LNG tank inventory and terminal send-out |
-| `cg.set_api_key(provider, key)` | Store key in `~/.clarigrid/keys.toml` |
+| `cg.get_weather(zone, start, end)` | Weather observations / forecasts |
+| `cg.status()` | Print connected providers, zones, capabilities |
+| `cg.set_api_key(provider, key)` | Store a provider key locally |
 | `cg.list_providers()` | List all registered provider names |
 | `cg.register_provider(name, instance)` | Register an external provider |
 
@@ -239,7 +309,7 @@ All data functions accept:
 ## Built-in providers
 
 | Name | Data | Zones | Auth |
-|------|------|-------|------|
+|---|---|---|---|
 | `energycharts` | prices, load, generation, forecasts, capacity, cross-border flows, frequency, renewable share | European countries and openly licensed price zones | None |
 | `energinet` | prices, load, generation, forecasts, physical flows, actual/forecast CO2 | DK1, DK2 | None |
 | `redata` | five-minute load/forecast; daily-average generation, shares and physical flows; installed capacity | ES | None |
@@ -255,6 +325,12 @@ All data functions accept:
 | `neso` | load, embedded generation, actual/forecast CO2, generation shares | GB | None |
 | `elexon` | prices, generation mix | GB | None |
 | `entsog` | gas flows, capacity | All ENTSOG operators | None |
+| `entsoe` | prices, load, generation | All ENTSO-E bidding zones | `ENTSOE_API_KEY` |
+| `tennet` | *(data fetching coming soon)* | NL | `TENNET_API_KEY` |
+
+Keys for `entsoe` and `tennet` are issued by the respective upstream provider.
+Store them via a [clarigrid.energy](https://clarigrid.energy) account or
+set them manually as described in [API key setup](#api-key-setup).
 
 ---
 
@@ -263,6 +339,10 @@ All data functions accept:
 ```
 clarigrid/
 ├── __init__.py           # public surface: connect, get_prices, set_timezone, …
+├── _auth.py              # KeyState machine, auth flows, provider key registry
+├── _keystore.py          # ~/.config/clarigrid/.env  read/write (chmod 600)
+├── _browser_flow.py      # browser-based OAuth flow (localhost callback server)
+├── cli.py                # clarigrid CLI (setup, connect, auth)
 ├── core/
 │   ├── api.py            # top-level functions — routing + normalisation
 │   ├── router.py         # ZoneRouter — (zone, capability) → provider
@@ -271,8 +351,9 @@ clarigrid/
 │   ├── registry.py       # register_provider / get_provider
 │   ├── interface.py      # DataProvider ABC ← providers implement this
 │   ├── cache.py          # filesystem Parquet cache
-│   ├── config.py         # ~/.clarigrid/keys.toml + env vars
-│   └── types.py          # shared constants, ProviderMeta
+│   ├── config.py         # legacy key store (~/.clarigrid/keys.toml)
+│   ├── exceptions.py     # exception hierarchy
+│   └── types.py          # shared constants, zone aliases
 ├── providers/
 │   ├── smard.py          # Bundesnetzagentur SMARD (DE)
 │   ├── energycharts.py   # Fraunhofer ISE Energy-Charts (Europe)
@@ -294,7 +375,6 @@ clarigrid/
 
 ### Plugin system
 
-The core package defines one interface (`DataProvider`) and a registry.
 External providers subclass `DataProvider`, declare their `zones()` and
 `capabilities()`, and self-register on import. Providers whose capabilities
 have different geographical coverage can additionally override
@@ -313,17 +393,12 @@ class NordpoolProvider(DataProvider):
         return {"prices"}
 
     def get_prices(self, zone, start, end, **kwargs) -> pd.DataFrame: ...
-    def get_load(self, zone, start, end, **kwargs) -> pd.DataFrame: ...
-    def get_generation(self, zone, start, end, **kwargs) -> pd.DataFrame: ...
 
 register_provider("nordpool", NordpoolProvider())
 ```
 
-After `cg.connect("nordpool")`, calls to `cg.get_prices("NO1", …)` will
-automatically route to this provider.
-
-The core package has **zero knowledge** of any specific provider at import
-time.
+After `cg.connect("nordpool")`, calls to `cg.get_prices("NO1", …)` route
+to this provider automatically.
 
 ---
 
