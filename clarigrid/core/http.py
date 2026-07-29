@@ -25,7 +25,7 @@ import requests
 from clarigrid.core.exceptions import ProviderUnavailableError, RateLimitError
 
 _SESSION = requests.Session()
-_SESSION.headers.update({"User-Agent": "clarigrid/0.1.0 (https://github.com/clarigrid/clarigrid)"})
+_SESSION.headers.update({"User-Agent": "clarigrid/0.2.0 (https://github.com/clarigrid/clarigrid)"})
 
 # Applied to every request unless overridden.
 DEFAULT_TIMEOUT = 30

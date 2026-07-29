@@ -24,11 +24,15 @@ _KEYS_TOML_TEMPLATE = """\
 #
 # Alternatively set environment variables:
 #   CLARIGRID_ENTSOE_API_KEY=your_key
+#   CLARIGRID_FINGRID_API_KEY=your_key
+#   CLARIGRID_GIE_API_KEY=your_key
 #
 # Key resolution order: env var > this file > config.json
 
 [keys]
 # entsoe = "YOUR_ENTSOE_API_KEY"
+# fingrid = "YOUR_FINGRID_API_KEY"
+# gie = "YOUR_GIE_API_KEY"
 """
 
 _config: dict[str, Any] = {}

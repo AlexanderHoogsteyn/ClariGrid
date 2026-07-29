@@ -23,4 +23,12 @@ ZONE_ALIASES: dict[str, str] = {
     "NETHERLANDS": "NL",
     "SPAIN": "ES",
     "ITALY_NORTH": "IT_NORD",
+    "CAISO": "CISO",
+    "ERCOT": "ERCO",
+    "NYISO": "NYIS",
+    "ISO-NE": "ISNE",
+    "ISO_NE": "ISNE",
+    "SPP": "SWPP",
+    "US": "US48",
+    "USA": "US48",
 }

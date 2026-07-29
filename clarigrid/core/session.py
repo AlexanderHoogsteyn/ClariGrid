@@ -41,8 +41,8 @@ def connect(name: str) -> None:
         )
 
     provider = _registry[name]
-    new_count, overwritten = _router.register(
-        name, provider.zones(), provider.capabilities()
+    new_count, overwritten = _router.register_coverage(
+        name, provider.capability_zones()
     )
     _connected[name] = provider
 

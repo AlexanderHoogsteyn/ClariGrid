@@ -24,8 +24,10 @@ optionally add a public wrapper function.
 
 from __future__ import annotations
 
+import hashlib
+import json
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import pandas as pd
 
@@ -36,7 +38,6 @@ from clarigrid.core import session as _session
 from clarigrid.core.normalise import EnergyFrame
 from clarigrid.core.registry import register_provider  # noqa: F401 — re-exported
 from clarigrid.utils.validation import resolve_zone, validate_date_range
-
 
 # ── Capability registry ────────────────────────────────────────────────────
 
@@ -211,6 +212,60 @@ def set_timezone(tz: str) -> None:
     _session.set_output_tz(tz)
 
 
+# ── Data retrieval helpers ─────────────────────────────────────────────────
+
+def _variant_cache_key(dataset: str, **values: object) -> str:
+    """Return a stable cache dataset key for optional query dimensions."""
+    relevant = {key: value for key, value in values.items() if value is not None}
+    if not relevant:
+        return dataset
+    encoded = json.dumps(relevant, sort_keys=True, separators=(",", ":"), default=str)
+    digest = hashlib.sha256(encoded.encode()).hexdigest()[:12]
+    return f"{dataset}_{digest}"
+
+
+def _fetch_capability(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    capability: str,
+    method_name: str,
+    source: str | None,
+    use_cache: bool,
+    cache_key: str | None = None,
+    **kwargs,
+) -> pd.DataFrame:
+    """Generic fetch/cache/stamp pipeline for simple (already-tidy) datasets.
+
+    Used by the secondary data functions (forecasts, balancing, cross-border,
+    CO2 …) whose providers return their final canonical columns directly, so
+    no shared ``normalise_*`` step is required.
+    """
+    zone = resolve_zone(zone)
+    validate_date_range(start, end)
+    provider_name, provider = _resolve_provider(zone, capability, source)
+
+    method = getattr(provider, method_name, None)
+    if method is None or capability not in provider.capabilities():
+        raise TypeError(
+            f"Provider '{provider_name}' does not support '{capability}'."
+        )
+
+    ck = cache_key or capability
+    if use_cache:
+        cached = _cache.load(provider_name, ck, zone, start, end)
+        if cached is not None:
+            return _session.apply_output_tz(cached)
+
+    df = method(zone=zone, start=start, end=end, **kwargs)
+    df = _stamp(df, provider_name, capability, zone)
+
+    if use_cache:
+        _cache.save(df, provider_name, ck, zone, start, end)
+    return _session.apply_output_tz(df)
+
+
 # ── Public data functions ──────────────────────────────────────────────────
 
 def get_prices(
@@ -218,6 +273,8 @@ def get_prices(
     start: str | pd.Timestamp,
     end: str | pd.Timestamp,
     *,
+    market: str = "day_ahead",
+    node: str | None = None,
     source: str | None = None,
     use_cache: bool = True,
 ) -> EnergyFrame:
@@ -227,6 +284,10 @@ def get_prices(
         zone: Bidding zone code (``"BE"``, ``"DE"``, ``"FR"`` …).
         start: Start date (inclusive).
         end: End date (inclusive).
+        market: Market interval. ``"day_ahead"`` is the interoperable
+            default; provider support for other values varies.
+        node: Optional nodal price location. Most European providers ignore
+            this; nodal providers such as CAISO use it.
         source: Override provider; defaults to the router-selected provider
             for this zone.
         use_cache: Read from / write to local Parquet cache.
@@ -239,8 +300,23 @@ def get_prices(
     zone = resolve_zone(zone)
     validate_date_range(start, end)
     provider_name, provider = _resolve_provider(zone, "prices", source)
+
+    cache_key = _variant_cache_key(
+        "prices",
+        market=None if market == "day_ahead" else market,
+        node=node,
+    )
     return _fetch_and_normalise(
-        "prices", zone, start, end, provider_name, provider, use_cache
+        "prices",
+        zone,
+        start,
+        end,
+        provider_name,
+        provider,
+        use_cache,
+        cache_dataset=cache_key,
+        market=market,
+        node=node,
     )
 
 
@@ -374,6 +450,64 @@ def get_capacity(
     )
 
 
+def get_gas_storage(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    company: str | None = None,
+    facility: str | None = None,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch daily gas storage inventory, injection, and withdrawal data.
+
+    Energy inventory uses MWh, daily rates use MWh/day, and fill level uses
+    percent. ``company`` and ``facility`` are optional provider-specific EIC
+    filters; a facility filter requires its operator company EIC.
+    """
+    cache_key = f"gas_storage_{company or 'all'}_{facility or 'all'}"
+    return _fetch_capability(
+        zone, start, end,
+        capability="gas_storage",
+        method_name="get_gas_storage",
+        source=source,
+        use_cache=use_cache,
+        cache_key=cache_key,
+        company=company,
+        facility=facility,
+    )
+
+
+def get_lng_inventory(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    company: str | None = None,
+    facility: str | None = None,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch daily LNG tank inventory and terminal send-out data.
+
+    LNG inventory remains in thousand cubic metres; send-out rates are
+    converted to MWh/day. A composition-independent conversion from LNG
+    volume to energy is intentionally not applied.
+    """
+    cache_key = f"lng_inventory_{company or 'all'}_{facility or 'all'}"
+    return _fetch_capability(
+        zone, start, end,
+        capability="lng_inventory",
+        method_name="get_lng_inventory",
+        source=source,
+        use_cache=use_cache,
+        cache_key=cache_key,
+        company=company,
+        facility=facility,
+    )
+
+
 def get_weather(
     zone: str,
     start: str | pd.Timestamp,
@@ -391,8 +525,8 @@ def get_weather(
         start: Start date (inclusive).
         end: End date (inclusive).
         source: Override provider name.
-        use_cache: Use local Parquet cache.  Note: cache key does not encode
-            ``**kwargs`` — set ``use_cache=False`` when varying variables.
+        use_cache: Use the local Parquet cache. Provider options and requested
+            variables are included in the cache key.
         **kwargs: Passed through to the provider (e.g. ``variables``).
 
     Returns:
@@ -408,9 +542,337 @@ def get_weather(
             f"Provider '{provider_name}' does not support weather data. "
             "Connect a weather provider first, e.g. cg.connect('openmeteo')."
         )
+    cache_key = _variant_cache_key("weather", **kwargs)
     return _fetch_and_normalise(
         "weather", zone, start, end, provider_name, provider, use_cache,
+        cache_dataset=cache_key,
         **kwargs,
+    )
+
+
+# ── Forecasts ───────────────────────────────────────────────────────────────
+
+def get_generation_forecast(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch wind/solar generation forecast (MW).
+
+    Elia: per-horizon wind/solar forecasts (``wind_*``, ``solar_*`` columns).
+    SMARD: day-ahead onshore/offshore/solar/combined forecast columns.
+    """
+    return _fetch_capability(
+        zone, start, end,
+        capability="generation_forecast",
+        method_name="get_generation_forecast",
+        source=source, use_cache=use_cache,
+    )
+
+
+def get_load_forecast(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch measured + day-ahead + week-ahead load forecast (MW)."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="load_forecast",
+        method_name="get_load_forecast",
+        source=source, use_cache=use_cache,
+    )
+
+
+def get_residual_load(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch residual load and pumped-storage consumption (MW).  SMARD only."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="residual_load",
+        method_name="get_residual_load",
+        source=source, use_cache=use_cache,
+    )
+
+
+# ── Imbalance & balancing (Elia) ──────────────────────────────────────────────
+
+def get_imbalance_prices(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch quarter-hour imbalance prices (EUR/MWh) and components."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="imbalance_prices",
+        method_name="get_imbalance_prices",
+        source=source, use_cache=use_cache,
+    )
+
+
+def get_system_imbalance(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch system imbalance (SI) and balancing component volumes (MW)."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="system_imbalance",
+        method_name="get_system_imbalance",
+        source=source, use_cache=use_cache,
+    )
+
+
+def get_balancing_volumes(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch activated balancing energy volumes per product (MW)."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="balancing_volumes",
+        method_name="get_balancing_volumes",
+        source=source, use_cache=use_cache,
+    )
+
+
+def get_balancing_prices(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch activated balancing energy prices per product (EUR/MWh)."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="balancing_prices",
+        method_name="get_balancing_prices",
+        source=source, use_cache=use_cache,
+    )
+
+
+# ── Cross-border & capacity (Elia) ────────────────────────────────────────────
+
+def get_physical_flows(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch cross-border physical flows per border (MW)."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="physical_flows",
+        method_name="get_physical_flows",
+        source=source, use_cache=use_cache,
+    )
+
+
+def get_commercial_schedule(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch day-ahead commercial exchange schedule per border (MW)."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="commercial_schedule",
+        method_name="get_commercial_schedule",
+        source=source, use_cache=use_cache,
+    )
+
+
+def get_installed_capacity(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    time_step: str = "yearly",
+    installation_decommission: bool = False,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch installed generation capacity by technology.
+
+    Capacity is returned in MW. Energy storage volume columns use MWh.
+    ``time_step`` can be ``"yearly"`` or ``"monthly"`` where supported.
+    """
+    cache_key = (
+        f"installed_capacity_{time_step}_"
+        f"{'changes' if installation_decommission else 'total'}"
+    )
+    return _fetch_capability(
+        zone, start, end,
+        capability="installed_capacity",
+        method_name="get_installed_capacity",
+        source=source,
+        use_cache=use_cache,
+        cache_key=cache_key,
+        time_step=time_step,
+        installation_decommission=installation_decommission,
+    )
+
+
+def get_ntc(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch net transfer capacity per border (MW)."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="ntc",
+        method_name="get_ntc",
+        source=source, use_cache=use_cache,
+    )
+
+
+def get_net_position(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch day-ahead implicit net position (MW; exports +, imports −)."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="net_position",
+        method_name="get_net_position",
+        source=source, use_cache=use_cache,
+    )
+
+
+# ── Environmental ─────────────────────────────────────────────────────────────
+
+def get_co2_intensity(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch production- and consumption-based CO2 intensity (gCO2eq/kWh)."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="co2_intensity",
+        method_name="get_co2_intensity",
+        source=source, use_cache=use_cache,
+    )
+
+
+def get_co2_forecast(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch forecast electricity carbon intensity in gCO2/kWh."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="co2_forecast",
+        method_name="get_co2_forecast",
+        source=source,
+        use_cache=use_cache,
+    )
+
+
+def get_frequency(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch system frequency in Hz.
+
+    Provider-specific range limits apply because frequency data can have
+    sub-minute resolution.
+    """
+    return _fetch_capability(
+        zone, start, end,
+        capability="frequency",
+        method_name="get_frequency",
+        source=source,
+        use_cache=use_cache,
+    )
+
+
+def get_renewable_share(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch renewable share of load and/or generation in percent."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="renewable_share",
+        method_name="get_renewable_share",
+        source=source,
+        use_cache=use_cache,
+    )
+
+
+def get_generation_share(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch generation mix as fuel shares in percent.
+
+    This is distinct from :func:`get_generation`, whose values are MW.
+    """
+    return _fetch_capability(
+        zone, start, end,
+        capability="generation_share",
+        method_name="get_generation_share",
+        source=source,
+        use_cache=use_cache,
     )
 
 

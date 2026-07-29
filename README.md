@@ -1,6 +1,6 @@
 # Clarigrid
 
-Unified Python SDK for European energy market data.
+Unified Python SDK for European and U.S. energy market data.
 
 [![PyPI](https://img.shields.io/pypi/v/clarigrid)](https://pypi.org/project/clarigrid/)
 [![Python](https://img.shields.io/pypi/pyversions/clarigrid)](https://pypi.org/project/clarigrid/)
@@ -11,14 +11,21 @@ Unified Python SDK for European energy market data.
 ## What it is
 
 Clarigrid provides a single, stable Python interface to access and normalise
-European energy market data from multiple sources.  All data comes back as
+European and U.S. energy market data from multiple sources. All data comes back as
 timezone-aware pandas DataFrames with consistent column names and units.
 
-Several data sources are **free and require no API key**: SMARD (DE), Elia (BE),
-NESO (GB), Elexon/BMRS (GB), ENTSOG (EU gas).
-
-Other sources such as **ENTSO-E** and **TenneT** require a personal API key from
-the provider.  See [API key setup](#api-key-setup) below.
+Built-in free providers (no API key required) include **Energy-Charts**
+(Europe), **Energinet** (DK1/DK2), **SMARD** (DE), **Elia** (BE), **NESO**
+(GB), **Elexon/BMRS** (GB), and **ENTSOG** (EU gas).
+Fingrid (FI), GIE AGSI/ALSI (European gas), and TenneT (NL) are also built in
+and use free API keys.
+For the United States, CAISO OASIS and NYISO provide no-auth market and system
+data. EIA-930 provides nationwide hourly balancing-authority load, forecasts,
+fuel generation, and physical interchange with a free EIA key.
+Global historical meteorology and solar data are available from NASA POWER
+without an API key.
+ENTSO-E and other key-protected sources can be configured as described in
+[API key setup](#api-key-setup) below.
 
 ---
 
@@ -47,6 +54,16 @@ cg.connect("elia")    # BE load, generation
 cg.connect("neso")    # GB load, embedded generation
 cg.connect("elexon")  # GB prices, generation mix
 cg.connect("entsog")  # EU gas flows (any TSO zone)
+cg.connect("energycharts")  # European prices, power, forecasts and flows
+cg.connect("energinet")  # DK1/DK2 prices, power, forecasts, flows and CO2
+cg.connect("redata")  # ES load, generation, capacity and cross-border flows
+cg.connect("rte")  # FR load, generation, forecasts, exchanges and CO2
+cg.connect("fingrid")  # FI power, forecasts, flows, balancing and CO2 (free key)
+cg.connect("gie")  # European gas storage and LNG inventory (free key)
+cg.connect("eia")  # US balancing-authority load, generation and flows (free key)
+cg.connect("caiso")  # CAISO day-ahead hub prices (no key)
+cg.connect("nyiso")  # NYISO prices, load, forecasts and fuel mix (no key)
+cg.connect("nasapower")  # Global daily/hourly weather and solar data (no key)
 
 # Optional: set output timezone (default is UTC).
 cg.set_timezone("Europe/Brussels")
@@ -56,6 +73,15 @@ prices = cg.get_prices("DE", "2025-01-01", "2025-01-07")  # → smard
 load   = cg.get_load("BE",   "2025-01-01", "2025-01-07")  # → elia
 gen    = cg.get_generation("GB", "2025-01-01", "2025-01-07")  # → elexon
 gas    = cg.get_gas_flows("BE-TSO-0001", "2025-01-01", "2025-01-07")  # → entsog
+us_load = cg.get_load("CAISO", "2025-01-01", "2025-01-07")  # → eia (CISO)
+np15 = cg.get_prices("CISO_NP15", "2025-01-01", "2025-01-07")  # → caiso
+nyc = cg.get_prices("NYISO_NYC", "2025-01-01", "2025-01-07")  # → nyiso
+weather = cg.get_weather(
+    "40.7128,-74.0060",
+    "2025-01-01",
+    "2025-01-07",
+    source="nasapower",
+)
 ```
 
 ---
@@ -90,7 +116,7 @@ clarigrid connect entsoe # authenticate a single provider
 browser is ever needed:
 
 ```bash
-export CLARIGRID_API_KEY=your-clarigrid-uuid 
+export CLARIGRID_API_KEY=your-clarigrid-uuid
 ```
 
 The SDK uses `CLARIGRID_API_KEY` to fetch all your stored provider keys
@@ -126,7 +152,8 @@ TENNET_API_KEY="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
 ## Zone routing
 
-Each call to `cg.connect()` registers a provider and its zone coverage in
+Each call to `cg.connect()` registers a provider and its capability-specific
+zone coverage in
 an internal router.  When you call `get_prices("DE")`, the router picks the
 best connected provider for that zone and dataset automatically.
 
@@ -170,16 +197,25 @@ All functions return a `pandas.DataFrame` with:
 | Load column | `load_mw` |
 | Generation columns | fuel-type specific, e.g. `solar_mw`, `wind_onshore_mw`, `nuclear_mw` |
 | Gas flow column | `flow_kwh_d` |
+| Gas storage | inventory in `*_mwh`; daily rates in `*_mwh_d` |
+| LNG inventory | `*_thousand_m3`; send-out in `*_mwh_d` |
+| Cross-border columns | signed MW; imports positive, exports negative |
+| Installed capacity | `*_capacity_mw`; storage energy uses `*_energy_mwh` |
+| Frequency | `frequency_hz` |
+| Renewable shares | `*_pct` |
 
-Price currency is stored in `df.attrs["currency"]` (`"EUR"` or `"GBP"`):
+Price currency is stored in `df.attrs["currency"]` (for example ``"EUR"``,
+``"GBP"``, or ``"USD"``):
 
 ```python
 df = cg.get_prices("DE", "2025-01-01", "2025-01-07")
 print(df.attrs["currency"])  # 'EUR'
 ```
 
-Zone codes follow the ENTSO-E bidding zone convention (`BE`, `DE_LU`, `FR` …).
-Common aliases (`DE` → `DE_LU`) are resolved automatically.
+European zone codes follow the ENTSO-E bidding zone convention (`BE`, `DE_LU`,
+`FR` ...). U.S. electricity uses EIA/NERC balancing-authority codes (`CISO`,
+`ERCO`, `PJM`, `NYIS`) and explicit market hubs (`CISO_NP15`). Common aliases
+(`DE` → `DE_LU`, `CAISO` → `CISO`, `ERCOT` → `ERCO`) resolve automatically.
 
 ---
 
@@ -242,12 +278,25 @@ clarigrid auth --clear --all       # remove all stored keys
 |---|---|
 | `cg.connect(provider)` | Connect provider; handles auth for key-guarded sources |
 | `cg.set_timezone(tz)` | Set output timezone (IANA string, default `"UTC"`) |
-| `cg.get_prices(zone, start, end)` | Day-ahead prices → `price_mwh` |
+| `cg.get_prices(zone, start, end, market="day_ahead", node=None)` | Electricity prices → `price_mwh`; optional node for nodal markets |
 | `cg.get_load(zone, start, end)` | Actual total load → `load_mw` |
-| `cg.get_generation(zone, start, end)` | Generation per fuel type → `*_mw` |
+| `cg.get_generation(zone, start, end)` | Generation per fuel type → `*_mw` columns |
+| `cg.get_generation_forecast(zone, start, end)` | Wind/solar generation forecast → `*_forecast_mw` |
+| `cg.get_load_forecast(zone, start, end)` | Load forecast → `load_forecast_mw` |
+| `cg.get_physical_flows(zone, start, end)` | Signed cross-border physical flows in MW |
+| `cg.get_commercial_schedule(zone, start, end)` | Signed commercial exchanges in MW |
+| `cg.get_installed_capacity(zone, start, end)` | Installed power by technology in MW |
+| `cg.get_frequency(zone, start, end)` | System frequency → `frequency_hz` |
+| `cg.get_renewable_share(zone, start, end)` | Renewable share in percent |
+| `cg.get_co2_intensity(zone, start, end)` | Electricity carbon intensity in gCO2/kWh |
+| `cg.get_co2_forecast(zone, start, end)` | Forecast carbon intensity in gCO2/kWh |
 | `cg.get_gas_flows(zone, start, end)` | Gas physical flows → `flow_kwh_d` |
+| `cg.get_capacity(zone, start, end)` | Firm technical gas capacity → `capacity_kwh_d` |
+| `cg.get_gas_storage(zone, start, end)` | Gas inventory, capacity, injection and withdrawal |
+| `cg.get_lng_inventory(zone, start, end)` | LNG tank inventory and terminal send-out |
 | `cg.get_weather(zone, start, end)` | Weather observations / forecasts |
 | `cg.status()` | Print connected providers, zones, capabilities |
+| `cg.set_api_key(provider, key)` | Store a provider key locally |
 | `cg.list_providers()` | List all registered provider names |
 | `cg.register_provider(name, instance)` | Register an external provider |
 
@@ -261,9 +310,19 @@ All data functions accept:
 
 | Name | Data | Zones | Auth |
 |---|---|---|---|
+| `energycharts` | prices, load, generation, forecasts, capacity, cross-border flows, frequency, renewable share | European countries and openly licensed price zones | None |
+| `energinet` | prices, load, generation, forecasts, physical flows, actual/forecast CO2 | DK1, DK2 | None |
+| `redata` | five-minute load/forecast; daily-average generation, shares and physical flows; installed capacity | ES | None |
+| `rte` | load, generation, load forecasts, physical/commercial exchanges, generation shares and CO2 | FR | None |
+| `fingrid` | load, generation, forecasts, flows, NTC, capacity, frequency, CO2, imbalance and balancing | FI | Free API key |
+| `gie` | daily underground gas storage and LNG terminal inventory | Europe, countries, facilities | Free API key |
+| `eia` | hourly load, forecast, fuel generation, physical interchange and generation shares | U.S. balancing authorities and regions | Free API key |
+| `caiso` | day-ahead LMP at NP15, SP15, ZP26 or an explicit node | California ISO | None |
+| `nyiso` | day-ahead zonal LBMP, actual/forecast load, fuel mix and shares | New York ISO and NYISO load zones | None |
+| `nasapower` | daily/hourly meteorology, precipitation, wind and solar radiation | Global point locations (`lat,lon`) | None |
 | `smard` | prices, load, generation | DE, AT, LU + TSO sub-zones | None |
 | `elia` | load, generation | BE | None |
-| `neso` | load, embedded generation | GB | None |
+| `neso` | load, embedded generation, actual/forecast CO2, generation shares | GB | None |
 | `elexon` | prices, generation mix | GB | None |
 | `entsog` | gas flows, capacity | All ENTSOG operators | None |
 | `entsoe` | prices, load, generation | All ENTSO-E bidding zones | `ENTSOE_API_KEY` |
@@ -297,9 +356,17 @@ clarigrid/
 │   └── types.py          # shared constants, zone aliases
 ├── providers/
 │   ├── smard.py          # Bundesnetzagentur SMARD (DE)
+│   ├── energycharts.py   # Fraunhofer ISE Energy-Charts (Europe)
+│   ├── energinet.py      # Energinet Energi Data Service (DK1/DK2)
+│   ├── redata.py         # Red Electrica REData (ES)
+│   ├── rte.py            # RTE Eco2mix (FR)
 │   ├── elia.py           # Elia Open Data (BE)
 │   ├── neso.py           # NESO Data Portal (GB)
 │   ├── elexon.py         # Elexon BMRS (GB)
+│   ├── eia.py            # EIA-930 balancing-authority operations (US)
+│   ├── caiso.py          # CAISO OASIS day-ahead prices (US)
+│   ├── nyiso.py          # NYISO prices, load, forecasts and fuel mix (US)
+│   ├── nasapower.py      # NASA POWER meteorology and solar data (global)
 │   └── entsog.py         # ENTSOG Transparency Platform (EU gas)
 └── utils/
     ├── time.py           # parse_dt, normalise_index
@@ -309,7 +376,9 @@ clarigrid/
 ### Plugin system
 
 External providers subclass `DataProvider`, declare their `zones()` and
-`capabilities()`, and self-register on import:
+`capabilities()`, and self-register on import. Providers whose capabilities
+have different geographical coverage can additionally override
+`capability_zones()`:
 
 ```python
 from clarigrid.core.interface import DataProvider

@@ -23,12 +23,11 @@ from __future__ import annotations
 import pandas as pd
 
 from clarigrid.core.types import (
-    COLUMN_GAS_CAP,   # noqa: F401 — re-exported for convenience
+    COLUMN_GAS_CAP,  # noqa: F401 — re-exported for convenience
     COLUMN_GAS_FLOW,  # noqa: F401
     COLUMN_LOAD,
     COLUMN_PRICE,
 )
-
 
 # ── EnergyFrame ────────────────────────────────────────────────────────────
 
@@ -67,7 +66,7 @@ class EnergyFrame(pd.DataFrame):
         # Keep column slices as plain Series — no metadata on a Series.
         return pd.Series
 
-    def __finalize__(self, other, method=None, **kwargs) -> "EnergyFrame":
+    def __finalize__(self, other, method=None, **kwargs) -> EnergyFrame:
         """Copy _clarigrid_meta through all pandas operations."""
         super().__finalize__(other, method=method, **kwargs)
         if isinstance(other, EnergyFrame):
@@ -84,7 +83,7 @@ class EnergyFrame(pd.DataFrame):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _set_meta(self, **kwargs) -> "EnergyFrame":
+    def _set_meta(self, **kwargs) -> EnergyFrame:
         """Set metadata key-value pairs on this frame (mutates in place).
 
         Also updates ``df.attrs`` for backward compatibility.
@@ -129,6 +128,7 @@ class EnergyFrame(pd.DataFrame):
 # ── Price column → currency map ────────────────────────────────────────────
 
 _PRICE_COL_MAP: dict[str, str] = {
+    "price_usd_mwh": "USD",
     "price_gbp_mwh": "GBP",
     "price_eur_mwh": "EUR",
     COLUMN_PRICE:    "EUR",   # already canonical; assume EUR if unset
@@ -183,7 +183,7 @@ def normalise_prices(df: pd.DataFrame) -> EnergyFrame:
     for src_col, default_currency in _PRICE_COL_MAP.items():
         if src_col in result.columns:
             if src_col != COLUMN_PRICE:
-                result = EnergyFrame(result.rename(columns={src_col: COLUMN_PRICE}))
+                result = result.rename(columns={src_col: COLUMN_PRICE})
             # Existing currency (e.g. from cache sidecar) takes precedence.
             currency = result.attrs.get("currency") or default_currency
             result._set_meta(currency=currency)
