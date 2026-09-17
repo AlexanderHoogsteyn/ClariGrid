@@ -18,14 +18,15 @@ After ``max_retries`` attempts a ``RateLimitError`` (for 429) or
 from __future__ import annotations
 
 import time
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 import requests
 
 from clarigrid.core.exceptions import ProviderUnavailableError, RateLimitError
 
 _SESSION = requests.Session()
-_SESSION.headers.update({"User-Agent": "clarigrid/0.2.0 (https://github.com/clarigrid/clarigrid)"})
+_SESSION.headers.update({"User-Agent": "clarigrid/0.3.0 (https://github.com/clarigrid/clarigrid)"})
 
 # Applied to every request unless overridden.
 DEFAULT_TIMEOUT = 30
