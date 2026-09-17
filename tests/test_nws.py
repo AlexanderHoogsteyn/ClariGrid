@@ -128,10 +128,10 @@ def test_provider_discovers_grid_and_sends_required_headers(
     assert all(headers == {"Accept": "application/geo+json"} for _, headers in calls)
 
 
-def test_public_api_cache_and_no_cache(monkeypatch, tmp_path):
+@pytest.mark.skipif(not cache._PARQUET_OK, reason="pyarrow not installed")
+def test_public_api_cache_and_timezone(monkeypatch, tmp_path):
     manager = CacheManager(tmp_path)
     monkeypatch.setattr(cache, "_manager", manager)
-    monkeypatch.setattr(cache, "_PARQUET_OK", True)
     calls = 0
 
     def fake_weather(self, zone, start, end, **kwargs):
@@ -161,26 +161,34 @@ def test_public_api_cache_and_no_cache(monkeypatch, tmp_path):
         )
         assert str(localized.index.tz) == "America/Chicago"
         assert calls == 1
-
-        cached_files = set(tmp_path.glob("*"))
-        cg.get_weather(
-            ZONE,
-            "2026-09-18",
-            "2026-09-18",
-            source=PROVIDER,
-            use_cache=False,
-        )
-        cg.get_weather(
-            ZONE,
-            "2026-09-18",
-            "2026-09-18",
-            source=PROVIDER,
-            use_cache=False,
-        )
-        assert calls == 3
-        assert set(tmp_path.glob("*")) == cached_files
     finally:
         cg.reset()
+
+
+def test_public_api_no_cache(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache, "_manager", CacheManager(tmp_path))
+    calls = 0
+
+    def fake_weather(self, zone, start, end, **kwargs):
+        nonlocal calls
+        calls += 1
+        return EnergyFrame(
+            {"temperature_c": [20.0]},
+            index=pd.DatetimeIndex(["2026-09-17T00:00:00Z"], name="utc_time"),
+        )
+
+    monkeypatch.setattr(NWSProvider, "get_weather", fake_weather)
+    for _ in range(2):
+        frame = cg.get_weather(
+            ZONE,
+            "2026-09-17",
+            "2026-09-17",
+            source=PROVIDER,
+            use_cache=False,
+        )
+    assert calls == 2
+    assert frame.attrs["provider"] == PROVIDER
+    assert not list(tmp_path.iterdir())
 
 
 @pytest.mark.live
