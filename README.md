@@ -23,7 +23,7 @@ For the United States, CAISO OASIS and NYISO provide no-auth market and system
 data. EIA-930 provides nationwide hourly balancing-authority load, forecasts,
 fuel generation, and physical interchange with a free EIA key.
 Global historical meteorology and solar data are available from NASA POWER
-without an API key.
+without an API key; official U.S. hourly forecasts are available from NOAA/NWS.
 ENTSO-E and other key-protected sources can be configured as described in
 [API key setup](#api-key-setup) below.
 
@@ -64,6 +64,7 @@ cg.connect("eia")  # US balancing-authority load, generation and flows (free key
 cg.connect("caiso")  # CAISO day-ahead hub prices (no key)
 cg.connect("nyiso")  # NYISO prices, load, forecasts and fuel mix (no key)
 cg.connect("nasapower")  # Global daily/hourly weather and solar data (no key)
+cg.connect("nws")  # Official U.S. hourly weather forecasts (no key)
 
 # Optional: set output timezone (default is UTC).
 cg.set_timezone("Europe/Brussels")
@@ -81,6 +82,12 @@ weather = cg.get_weather(
     "2025-01-01",
     "2025-01-07",
     source="nasapower",
+)
+nws_forecast = cg.get_weather(
+    "39.7456,-97.0892",
+    "2026-09-17",
+    "2026-09-18",
+    source="nws",
 )
 ```
 
@@ -320,6 +327,7 @@ All data functions accept:
 | `caiso` | day-ahead LMP at NP15, SP15, ZP26 or an explicit node | California ISO | None |
 | `nyiso` | day-ahead zonal LBMP, actual/forecast load, fuel mix and shares | New York ISO and NYISO load zones | None |
 | `nasapower` | daily/hourly meteorology, precipitation, wind and solar radiation | Global point locations (`lat,lon`) | None |
+| `nws` | hourly temperature, humidity, wind, cloud and precipitation-probability forecasts | U.S., territories and adjacent waters (`lat,lon`) | None |
 | `smard` | prices, load, generation | DE, AT, LU + TSO sub-zones | None |
 | `elia` | load, generation | BE | None |
 | `neso` | load, embedded generation, actual/forecast CO2, generation shares | GB | None |
@@ -367,6 +375,7 @@ clarigrid/
 │   ├── caiso.py          # CAISO OASIS day-ahead prices (US)
 │   ├── nyiso.py          # NYISO prices, load, forecasts and fuel mix (US)
 │   ├── nasapower.py      # NASA POWER meteorology and solar data (global)
+│   ├── nws.py            # NOAA/NWS hourly grid forecasts (US)
 │   └── entsog.py         # ENTSOG Transparency Platform (EU gas)
 └── utils/
     ├── time.py           # parse_dt, normalise_index
