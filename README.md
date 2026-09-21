@@ -1,6 +1,6 @@
 # Clarigrid
 
-Unified Python SDK for European and U.S. energy market data.
+Unified Python SDK for global energy market data.
 
 [![PyPI](https://img.shields.io/pypi/v/clarigrid)](https://pypi.org/project/clarigrid/)
 [![Python](https://img.shields.io/pypi/pyversions/clarigrid)](https://pypi.org/project/clarigrid/)
@@ -11,7 +11,7 @@ Unified Python SDK for European and U.S. energy market data.
 ## What it is
 
 Clarigrid provides a single, stable Python interface to access and normalise
-European and U.S. energy market data from multiple sources. All data comes back as
+energy market data from Europe, the United States, and Asia. All data comes back as
 timezone-aware pandas DataFrames with consistent column names and units.
 
 Built-in free providers (no API key required) include **Energy-Charts**
@@ -63,6 +63,7 @@ cg.connect("gie")  # European gas storage and LNG inventory (free key)
 cg.connect("eia")  # US balancing-authority load, generation and flows (free key)
 cg.connect("caiso")  # CAISO day-ahead hub prices (no key)
 cg.connect("nyiso")  # NYISO prices, load, forecasts and fuel mix (no key)
+cg.connect("singstat")  # Singapore monthly electricity generation (no key)
 cg.connect("nasapower")  # Global daily/hourly weather and solar data (no key)
 cg.connect("nws")  # Official U.S. hourly weather forecasts (no key)
 
@@ -77,6 +78,7 @@ gas    = cg.get_gas_flows("BE-TSO-0001", "2025-01-01", "2025-01-07")  # → ents
 us_load = cg.get_load("CAISO", "2025-01-01", "2025-01-07")  # → eia (CISO)
 np15 = cg.get_prices("CISO_NP15", "2025-01-01", "2025-01-07")  # → caiso
 nyc = cg.get_prices("NYISO_NYC", "2025-01-01", "2025-01-07")  # → nyiso
+sg_generation = cg.get_generation("SG", "2025-01-01", "2025-04-01")  # → singstat
 weather = cg.get_weather(
     "40.7128,-74.0060",
     "2025-01-01",
@@ -326,6 +328,7 @@ All data functions accept:
 | `eia` | hourly load, forecast, fuel generation, physical interchange and generation shares | U.S. balancing authorities and regions | Free API key |
 | `caiso` | day-ahead LMP at NP15, SP15, ZP26 or an explicit node | California ISO | None |
 | `nyiso` | day-ahead zonal LBMP, actual/forecast load, fuel mix and shares | New York ISO and NYISO load zones | None |
+| `singstat` | monthly-average total electricity generation | SG | None |
 | `nasapower` | daily/hourly meteorology, precipitation, wind and solar radiation | Global point locations (`lat,lon`) | None |
 | `nws` | hourly temperature, humidity, wind, cloud and precipitation-probability forecasts | U.S., territories and adjacent waters (`lat,lon`) | None |
 | `smard` | prices, load, generation | DE, AT, LU + TSO sub-zones | None |
