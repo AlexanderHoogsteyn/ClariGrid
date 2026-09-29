@@ -320,6 +320,7 @@ All data functions accept:
 | `energycharts` | prices, load, generation, forecasts, capacity, cross-border flows, frequency, renewable share | European countries and openly licensed price zones | None |
 | `energinet` | prices, load, generation, forecasts, physical flows, actual/forecast CO2 | DK1, DK2 | None |
 | `elhub` | hourly metered consumption and generation by production group | NO1–NO5 | None |
+| `pse` | 15-minute actual and forecast power-system load | PL | None |
 | `redata` | five-minute load/forecast; daily-average generation, shares and physical flows; installed capacity | ES | None |
 | `rte` | load, generation, load forecasts, physical/commercial exchanges, generation shares and CO2 | FR | None |
 | `fingrid` | load, generation, forecasts, flows, NTC, capacity, frequency, CO2, imbalance and balancing | FI | Free API key |
