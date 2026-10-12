@@ -8,7 +8,7 @@ Tier A — no API key:
     entsog, smard, elia, neso, elexon, energycharts, energinet, pse, elhub, redata, rte
     (energy market data)
     caiso, nyiso                        (US electricity markets)
-    openmeteo, nasapower, nws, rmi, dwd (weather data)
+    openmeteo, nasapower, nws, metno, rmi, dwd (weather data)
 
 Tier B — free API key:
     fingrid                             (FI power system; data.fingrid.fi)
@@ -29,6 +29,7 @@ from clarigrid.providers import (
     entsog,
     fingrid,
     gie,
+    metno,
     nasapower,
     neso,
     nws,
@@ -48,5 +49,5 @@ __all__ = [
     "redata",
     "rte",
     "fingrid", "gie",
-    "openmeteo", "nasapower", "nws", "rmi", "dwd", "tennet",
+    "openmeteo", "nasapower", "nws", "metno", "rmi", "dwd", "tennet",
 ]
