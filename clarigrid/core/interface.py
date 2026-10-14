@@ -183,7 +183,7 @@ class GasDataProvider(DataProvider):
 class WeatherDataProvider(DataProvider):
     """Base interface for weather / meteorological data providers.
 
-    Providers like Open-Meteo, RMI, and DWD implement this class.
+    Providers like Open-Meteo, MET Norway, RMI, and DWD implement this class.
     They override the electricity stubs with informative errors and expose
     ``get_weather()`` instead.
     """
@@ -201,6 +201,7 @@ class WeatherDataProvider(DataProvider):
         Args:
             zone: Location identifier. Format is provider-specific:
                 - Open-Meteo: ``"lat,lon"`` (e.g. ``"50.85,4.35"``)
+                - MET Norway: ``"lat,lon"`` (e.g. ``"59.91,10.75"``)
                 - RMI/SYNOP: station ID string (e.g. ``"6447"``)
                 - DWD: 5-digit station ID (e.g. ``"02564"``)
             start: ISO date string.

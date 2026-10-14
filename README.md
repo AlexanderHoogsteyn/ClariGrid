@@ -330,6 +330,7 @@ All data functions accept:
 | `nyiso` | day-ahead zonal LBMP, actual/forecast load, fuel mix and shares | New York ISO and NYISO load zones | None |
 | `nasapower` | daily/hourly meteorology, precipitation, wind and solar radiation | Global point locations (`lat,lon`) | None |
 | `nws` | hourly temperature, humidity, wind, cloud and precipitation-probability forecasts | U.S., territories and adjacent waters (`lat,lon`) | None |
+| `metno` | temperature, pressure, humidity, cloud, wind and precipitation forecasts | Global point locations (`lat,lon`) | None |
 | `smard` | prices, load, generation | DE, AT, LU + TSO sub-zones | None |
 | `elia` | load, generation | BE | None |
 | `neso` | load, embedded generation, actual/forecast CO2, generation shares | GB | None |
@@ -337,6 +338,15 @@ All data functions accept:
 | `entsog` | gas flows, capacity | All ENTSOG operators | None |
 | `entsoe` | prices, load, generation | All ENTSO-E bidding zones | `ENTSOE_API_KEY` |
 | `tennet` | *(data fetching coming soon)* | NL | `TENNET_API_KEY` |
+
+MET Norway uses the official
+[Locationforecast 2.0](https://api.met.no/weatherapi/locationforecast/2.0/documentation)
+compact forecast. Pass a global point as `lat,lon` and optionally an integer
+`altitude` in metres. Coordinates are rounded to the upstream four-decimal
+limit, results are normalized to UTC, and the SDK supplies the identifying
+User-Agent required by MET Norway. The endpoint serves current forecasts only;
+historical model data is not fetched by this provider. Reuse requires
+[MET Norway attribution](https://api.met.no/doc/License).
 
 Keys for `entsoe` and `tennet` are issued by the respective upstream provider.
 Store them via a [clarigrid.energy](https://clarigrid.energy) account or
@@ -378,6 +388,7 @@ clarigrid/
 │   ├── nyiso.py          # NYISO prices, load, forecasts and fuel mix (US)
 │   ├── nasapower.py      # NASA POWER meteorology and solar data (global)
 │   ├── nws.py            # NOAA/NWS hourly grid forecasts (US)
+│   ├── metno.py          # MET Norway global point forecasts
 │   └── entsog.py         # ENTSOG Transparency Platform (EU gas)
 └── utils/
     ├── time.py           # parse_dt, normalise_index
