@@ -14,6 +14,7 @@ from clarigrid.core.api import (
     get_co2_intensity,
     get_commercial_schedule,
     get_frequency,
+    get_gas_demand,
     get_gas_flows,
     get_gas_storage,
     get_generation,
@@ -49,6 +50,7 @@ __all__ = [
     "get_load",
     "get_generation",
     "get_generation_share",
+    "get_gas_demand",
     "get_gas_flows",
     "get_gas_storage",
     "get_lng_inventory",
@@ -77,7 +79,7 @@ __all__ = [
     "cache",
 ]
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 
 # ── First-run setup check ──────────────────────────────────────────────────

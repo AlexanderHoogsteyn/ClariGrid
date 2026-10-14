@@ -479,6 +479,24 @@ def get_gas_storage(
     )
 
 
+def get_gas_demand(
+    zone: str,
+    start: str | pd.Timestamp,
+    end: str | pd.Timestamp,
+    *,
+    source: str | None = None,
+    use_cache: bool = True,
+) -> pd.DataFrame:
+    """Fetch daily gas demand by sector in GWh."""
+    return _fetch_capability(
+        zone, start, end,
+        capability="gas_demand",
+        method_name="get_gas_demand",
+        source=source,
+        use_cache=use_cache,
+    )
+
+
 def get_lng_inventory(
     zone: str,
     start: str | pd.Timestamp,
