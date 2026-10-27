@@ -16,7 +16,7 @@ timezone-aware pandas DataFrames with consistent column names and units.
 
 Built-in free providers (no API key required) include **Energy-Charts**
 (Europe), **Energinet** (DK1/DK2), **SMARD** (DE), **Elia** (BE), **NESO**
-(GB), **Elexon/BMRS** (GB), and **ENTSOG** (EU gas).
+(GB), **Elexon/BMRS** (GB), **ENTSOG** (EU gas), and **Gas Networks Ireland**.
 Fingrid (FI), GIE AGSI/ALSI (European gas), and TenneT (NL) are also built in
 and use free API keys.
 For the United States, CAISO OASIS and NYISO provide no-auth market and system
@@ -60,6 +60,7 @@ cg.connect("redata")  # ES load, generation, capacity and cross-border flows
 cg.connect("rte")  # FR load, generation, forecasts, exchanges and CO2
 cg.connect("fingrid")  # FI power, forecasts, flows, balancing and CO2 (free key)
 cg.connect("gie")  # European gas storage and LNG inventory (free key)
+cg.connect("gni")  # IE daily gas demand by sector (no key)
 cg.connect("eia")  # US balancing-authority load, generation and flows (free key)
 cg.connect("caiso")  # CAISO day-ahead hub prices (no key)
 cg.connect("nyiso")  # NYISO prices, load, forecasts and fuel mix (no key)
@@ -74,6 +75,7 @@ prices = cg.get_prices("DE", "2025-01-01", "2025-01-07")  # → smard
 load   = cg.get_load("BE",   "2025-01-01", "2025-01-07")  # → elia
 gen    = cg.get_generation("GB", "2025-01-01", "2025-01-07")  # → elexon
 gas    = cg.get_gas_flows("BE-TSO-0001", "2025-01-01", "2025-01-07")  # → entsog
+ie_gas = cg.get_gas_demand("IE", "2025-01-01", "2025-01-07")  # → gni
 us_load = cg.get_load("CAISO", "2025-01-01", "2025-01-07")  # → eia (CISO)
 np15 = cg.get_prices("CISO_NP15", "2025-01-01", "2025-01-07")  # → caiso
 nyc = cg.get_prices("NYISO_NYC", "2025-01-01", "2025-01-07")  # → nyiso
@@ -299,6 +301,7 @@ clarigrid auth --clear --all       # remove all stored keys
 | `cg.get_co2_forecast(zone, start, end)` | Forecast carbon intensity in gCO2/kWh |
 | `cg.get_gas_flows(zone, start, end)` | Gas physical flows → `flow_kwh_d` |
 | `cg.get_capacity(zone, start, end)` | Firm technical gas capacity → `capacity_kwh_d` |
+| `cg.get_gas_demand(zone, start, end)` | Daily gas demand by sector in GWh |
 | `cg.get_gas_storage(zone, start, end)` | Gas inventory, capacity, injection and withdrawal |
 | `cg.get_lng_inventory(zone, start, end)` | LNG tank inventory and terminal send-out |
 | `cg.get_weather(zone, start, end)` | Weather observations / forecasts |
@@ -326,6 +329,7 @@ All data functions accept:
 | `rte` | load, generation, load forecasts, physical/commercial exchanges, generation shares and CO2 | FR | None |
 | `fingrid` | load, generation, forecasts, flows, NTC, capacity, frequency, CO2, imbalance and balancing | FI | Free API key |
 | `gie` | daily underground gas storage and LNG terminal inventory | Europe, countries, facilities | Free API key |
+| `gni` | daily gas demand by sector | IE | None |
 | `eia` | hourly load, forecast, fuel generation, physical interchange and generation shares | U.S. balancing authorities and regions | Free API key |
 | `caiso` | day-ahead LMP at NP15, SP15, ZP26 or an explicit node | California ISO | None |
 | `nyiso` | day-ahead zonal LBMP, actual/forecast load, fuel mix and shares | New York ISO and NYISO load zones | None |
