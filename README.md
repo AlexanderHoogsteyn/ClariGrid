@@ -324,6 +324,7 @@ All data functions accept:
 | `energinet` | prices, load, generation, forecasts, physical flows, actual/forecast CO2 | DK1, DK2 | None |
 | `elhub` | hourly metered consumption and generation by production group | NO1–NO5 | None |
 | `pse` | 15-minute actual and forecast power-system load | PL | None |
+| `sfoe` | daily national load forecast with 2.5%/97.5% confidence bounds | CH | None |
 | `redata` | five-minute load/forecast; daily-average generation, shares and physical flows; installed capacity | ES | None |
 | `rte` | load, generation, load forecasts, physical/commercial exchanges, generation shares and CO2 | FR | None |
 | `fingrid` | load, generation, forecasts, flows, NTC, capacity, frequency, CO2, imbalance and balancing | FI | Free API key |
@@ -351,6 +352,14 @@ limit, results are normalized to UTC, and the SDK supplies the identifying
 User-Agent required by MET Norway. The endpoint serves current forecasts only;
 historical model data is not fetched by this provider. Reuse requires
 [MET Norway attribution](https://api.met.no/doc/License).
+
+SFOE uses the Swiss Federal Office of Energy's versioned
+[Energy Dashboard public API](https://energiedashboard.ch/api/swagger-ui/index.html)
+for the SDSC national electricity-consumption forecast. Source values are daily
+GWh and are exposed as DST-aware daily-average MW in `load_forecast_min_mw`,
+`load_forecast_mw`, and `load_forecast_max_mw`. Reuse is commercial and
+non-commercial with mandatory source attribution under the
+[opendata.swiss terms](https://opendata.swiss/en/terms-of-use#terms_by).
 
 Keys for `entsoe` and `tennet` are issued by the respective upstream provider.
 Store them via a [clarigrid.energy](https://clarigrid.energy) account or
