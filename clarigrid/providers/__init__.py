@@ -5,7 +5,8 @@ after ``import clarigrid``. Paid/external providers (e.g. clarigrid-nordpool)
 must still be imported explicitly.
 
 Tier A — no API key:
-    entsog, smard, elia, neso, elexon, energycharts, energinet, pse, elhub, sfoe, gni, redata, rte
+    redata, rte
+    entsog, smard, elia, neso, elexon, energycharts, energinet, pse, elhub, eirgrid, sfoe, gni, redata, rte
     (energy market data)
     caiso, nyiso                        (US electricity markets)
     openmeteo, nasapower, nws, metno, rmi, dwd (weather data)
@@ -21,6 +22,7 @@ from clarigrid.providers import (
     caiso,
     dwd,
     eia,
+    eirgrid,
     elexon,
     elhub,
     elia,
@@ -47,6 +49,8 @@ from clarigrid.providers import (
 
 __all__ = [
     "caiso", "eia", "nyiso",
+    "entsog", "smard", "elia", "neso", "elexon", "eirgrid",
+    "energycharts", "energinet", "elhub", "pse",
     "entsog", "smard", "elia", "neso", "elexon", "energycharts", "energinet", "elhub", "pse",
     "sfoe", "gni",
     "redata",

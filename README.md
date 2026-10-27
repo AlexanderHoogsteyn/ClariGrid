@@ -324,6 +324,7 @@ All data functions accept:
 | `energinet` | prices, load, generation, forecasts, physical flows, actual/forecast CO2 | DK1, DK2 | None |
 | `elhub` | hourly metered consumption and generation by production group | NO1–NO5 | None |
 | `pse` | 15-minute actual and forecast power-system load | PL | None |
+| `eirgrid` | 15-minute actual system demand | IE, GB-NIR | None |
 | `sfoe` | daily national load forecast with 2.5%/97.5% confidence bounds | CH | None |
 | `redata` | five-minute load/forecast; daily-average generation, shares and physical flows; installed capacity | ES | None |
 | `rte` | load, generation, load forecasts, physical/commercial exchanges, generation shares and CO2 | FR | None |
@@ -353,6 +354,11 @@ User-Agent required by MET Norway. The endpoint serves current forecasts only;
 historical model data is not fetched by this provider. Reuse requires
 [MET Norway attribution](https://api.met.no/doc/License).
 
+EirGrid uses the official [Smart Grid Dashboard](https://www.smartgriddashboard.com/all/demand/)
+JSON feed for 15-minute Republic of Ireland and Northern Ireland system demand.
+The feed is keyless, timestamps are normalized from the dashboard's UTC values,
+and reuse requires the attribution `Supported by EirGrid Group Data` under the
+[EirGrid Group Open Data Licence](https://www.smartgriddashboard.com/all/open-data-license/).
 SFOE uses the Swiss Federal Office of Energy's versioned
 [Energy Dashboard public API](https://energiedashboard.ch/api/swagger-ui/index.html)
 for the SDSC national electricity-consumption forecast. Source values are daily
