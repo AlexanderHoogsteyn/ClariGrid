@@ -63,8 +63,8 @@ class DataProvider(ABC):
         will not be routed to for any capability.
 
         Returns:
-            Set of strings from ``{"prices", "load", "generation",
-            "gas_flows", "capacity", "weather"}``.
+            Registered capability names such as ``prices``, ``load``,
+            ``generation``, ``gas_demand``, ``gas_flows``, or ``weather``.
         """
         return set()
 
