@@ -337,6 +337,7 @@ All data functions accept:
 | `nasapower` | daily/hourly meteorology, precipitation, wind and solar radiation | Global point locations (`lat,lon`) | None |
 | `nws` | hourly temperature, humidity, wind, cloud and precipitation-probability forecasts | U.S., territories and adjacent waters (`lat,lon`) | None |
 | `metno` | temperature, pressure, humidity, cloud, wind and precipitation forecasts | Global point locations (`lat,lon`) | None |
+| `fmi` | hourly temperature, humidity, pressure, wind and precipitation observations | Finnish FMI stations (`fmisid`) | None |
 | `smard` | prices, load, generation | DE, AT, LU + TSO sub-zones | None |
 | `elia` | load, generation | BE | None |
 | `neso` | load, embedded generation, actual/forecast CO2, generation shares | GB | None |
@@ -353,6 +354,13 @@ limit, results are normalized to UTC, and the SDK supplies the identifying
 User-Agent required by MET Norway. The endpoint serves current forecasts only;
 historical model data is not fetched by this provider. Reuse requires
 [MET Norway attribution](https://api.met.no/doc/License).
+
+FMI uses the official [WFS 2.0 download service](https://en.ilmatieteenlaitos.fi/open-data-manual-time-series-data)
+for hourly observations from Finnish stations. Pass the numeric `fmisid` as the
+zone (for example, `100971` for Helsinki Kaisaniemi). Results are normalized to
+UTC and canonical weather units; FMI's `-1` no-rain marker is normalized to
+zero millimetres. Reuse requires Finnish Meteorological Institute attribution
+under [CC BY 4.0](https://ftp.csc.fi/pub/sci/geo/geodata/ilmatiede/FMI_terms_of_use_2018.pdf).
 
 EirGrid uses the official [Smart Grid Dashboard](https://www.smartgriddashboard.com/all/demand/)
 JSON feed for 15-minute Republic of Ireland and Northern Ireland system demand.
@@ -408,6 +416,7 @@ clarigrid/
 │   ├── nasapower.py      # NASA POWER meteorology and solar data (global)
 │   ├── nws.py            # NOAA/NWS hourly grid forecasts (US)
 │   ├── metno.py          # MET Norway global point forecasts
+│   ├── fmi.py            # FMI hourly station observations (Finland)
 │   └── entsog.py         # ENTSOG Transparency Platform (EU gas)
 └── utils/
     ├── time.py           # parse_dt, normalise_index
