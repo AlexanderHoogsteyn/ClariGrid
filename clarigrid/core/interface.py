@@ -202,6 +202,7 @@ class WeatherDataProvider(DataProvider):
             zone: Location identifier. Format is provider-specific:
                 - Open-Meteo: ``"lat,lon"`` (e.g. ``"50.85,4.35"``)
                 - MET Norway: ``"lat,lon"`` (e.g. ``"59.91,10.75"``)
+                - FMI: numeric ``fmisid`` station code (e.g. ``"100971"``)
                 - RMI/SYNOP: station ID string (e.g. ``"6447"``)
                 - DWD: 5-digit station ID (e.g. ``"02564"``)
             start: ISO date string.

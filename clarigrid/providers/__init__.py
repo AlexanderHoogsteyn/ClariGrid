@@ -6,9 +6,11 @@ must still be imported explicitly.
 
 Tier A — no API key:
     entsog, smard, elia, neso, elexon, energycharts, energinet, pse, elhub,
+    eirgrid, sfoe, gni, redata, rte
+    (energy market data)
     eirgrid, sfoe, gni, svk, redata, rte (energy market data)
     caiso, nyiso                        (US electricity markets)
-    openmeteo, nasapower, nws, metno, rmi, dwd (weather data)
+    openmeteo, nasapower, nws, metno, fmi, rmi, dwd (weather data)
 
 Tier B — free API key:
     fingrid                             (FI power system; data.fingrid.fi)
@@ -29,6 +31,7 @@ from clarigrid.providers import (
     energycharts,
     entsog,
     fingrid,
+    fmi,
     gie,
     gni,
     metno,
@@ -66,6 +69,8 @@ __all__ = [
     "svk",
     "redata",
     "rte",
+    "fingrid", "gie",
+    "openmeteo", "nasapower", "nws", "metno", "fmi", "rmi", "dwd", "tennet",
     "fingrid",
     "gie",
     "openmeteo",
