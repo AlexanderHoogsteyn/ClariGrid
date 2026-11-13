@@ -16,7 +16,8 @@ timezone-aware pandas DataFrames with consistent column names and units.
 
 Built-in free providers (no API key required) include **Energy-Charts**
 (Europe), **Energinet** (DK1/DK2), **SMARD** (DE), **Elia** (BE), **NESO**
-(GB), **Elexon/BMRS** (GB), **ENTSOG** (EU gas), and **Gas Networks Ireland**.
+(GB), **Elexon/BMRS** (GB), **ENTSOG** (EU gas), **Gas Networks Ireland**,
+and **Svenska kraftnät** (Swedish cross-border flows).
 Fingrid (FI), GIE AGSI/ALSI (European gas), and TenneT (NL) are also built in
 and use free API keys.
 For the United States, CAISO OASIS and NYISO provide no-auth market and system
@@ -61,6 +62,7 @@ cg.connect("rte")  # FR load, generation, forecasts, exchanges and CO2
 cg.connect("fingrid")  # FI power, forecasts, flows, balancing and CO2 (free key)
 cg.connect("gie")  # European gas storage and LNG inventory (free key)
 cg.connect("gni")  # IE daily gas demand by sector (no key)
+cg.connect("svk")  # SE1-SE4 physical power flows (no key)
 cg.connect("eia")  # US balancing-authority load, generation and flows (free key)
 cg.connect("caiso")  # CAISO day-ahead hub prices (no key)
 cg.connect("nyiso")  # NYISO prices, load, forecasts and fuel mix (no key)
@@ -76,6 +78,7 @@ load   = cg.get_load("BE",   "2025-01-01", "2025-01-07")  # → elia
 gen    = cg.get_generation("GB", "2025-01-01", "2025-01-07")  # → elexon
 gas    = cg.get_gas_flows("BE-TSO-0001", "2025-01-01", "2025-01-07")  # → entsog
 ie_gas = cg.get_gas_demand("IE", "2025-01-01", "2025-01-07")  # → gni
+se_flows = cg.get_physical_flows("SE3", "2026-10-01", "2026-10-02")  # → svk
 us_load = cg.get_load("CAISO", "2025-01-01", "2025-01-07")  # → eia (CISO)
 np15 = cg.get_prices("CISO_NP15", "2025-01-01", "2025-01-07")  # → caiso
 nyc = cg.get_prices("NYISO_NYC", "2025-01-01", "2025-01-07")  # → nyiso
