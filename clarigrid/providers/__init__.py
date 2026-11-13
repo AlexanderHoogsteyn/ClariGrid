@@ -8,6 +8,7 @@ Tier A — no API key:
     entsog, smard, elia, neso, elexon, energycharts, energinet, pse, elhub,
     eirgrid, sfoe, gni, redata, rte
     (energy market data)
+    eirgrid, sfoe, gni, svk, redata, rte (energy market data)
     caiso, nyiso                        (US electricity markets)
     openmeteo, nasapower, nws, metno, fmi, rmi, dwd (weather data)
 
@@ -45,17 +46,38 @@ from clarigrid.providers import (
     rte,
     sfoe,
     smard,
+    svk,
     tennet,
 )
 
 __all__ = [
-    "caiso", "eia", "nyiso",
-    "entsog", "smard", "elia", "neso", "elexon", "eirgrid",
-    "energycharts", "energinet", "elhub", "pse",
-    "entsog", "smard", "elia", "neso", "elexon", "energycharts", "energinet", "elhub", "pse",
-    "sfoe", "gni",
+    "caiso",
+    "eia",
+    "nyiso",
+    "entsog",
+    "smard",
+    "elia",
+    "neso",
+    "elexon",
+    "eirgrid",
+    "energycharts",
+    "energinet",
+    "elhub",
+    "pse",
+    "sfoe",
+    "gni",
+    "svk",
     "redata",
     "rte",
     "fingrid", "gie",
     "openmeteo", "nasapower", "nws", "metno", "fmi", "rmi", "dwd", "tennet",
+    "fingrid",
+    "gie",
+    "openmeteo",
+    "nasapower",
+    "nws",
+    "metno",
+    "rmi",
+    "dwd",
+    "tennet",
 ]
