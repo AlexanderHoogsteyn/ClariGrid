@@ -329,6 +329,11 @@ All data functions accept:
 
 ## Built-in providers
 
+For a new dataset, add a descriptor to `clarigrid/catalog.json` alongside its
+provider tests. Use the established website slug when one exists and include a
+bounded example for hosted MCP verification. The descriptors are available via
+`clarigrid.catalog.dataset_descriptors()` and ship in the SDK wheel.
+
 | Name | Data | Zones | Auth |
 |---|---|---|---|
 | `energycharts` | prices, load, generation, forecasts, capacity, cross-border flows, frequency, renewable share | European countries and openly licensed price zones | None |

@@ -28,6 +28,25 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install build
       - run: python -m build
+      - name: Verify installed wheel against release
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python -m pip install dist/*.whl
+          cd "$RUNNER_TEMP"
+          python - <<'PY'
+          import os
+          import tomllib
+          from importlib.metadata import version
+          from pathlib import Path
+          import clarigrid
+          from clarigrid.catalog import dataset_descriptors
+          root = Path(os.environ["GITHUB_WORKSPACE"])
+          source = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+          assert os.environ["RELEASE_TAG"] == f"v{source}"
+          assert source == clarigrid.__version__ == version("clarigrid")
+          assert dataset_descriptors()
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: python-package-distributions
@@ -47,3 +66,15 @@ jobs:
           name: python-package-distributions
           path: dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  notify-hosted-mcp:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch hosted MCP sync
+        env:
+          GH_TOKEN: ${{ secrets.CLARIGRID_HUB_DISPATCH_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh api --method POST repos/AlexanderHoogsteyn/clarigrid-energy-hub/dispatches \
+            -f event_type=clarigrid-sdk-published -f "client_payload[version]=${RELEASE_TAG#v}"

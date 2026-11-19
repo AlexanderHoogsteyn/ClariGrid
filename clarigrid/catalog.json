@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "datasets": [
+    {
+      "slug": "noaa-ghcn-daily",
+      "source": "ncei",
+      "capability": "weather",
+      "title": "NOAA Global Historical Climatology Network Daily (GHCNd)",
+      "description": "Daily station observations from NOAA. Clarigrid SDK access covers U.S. stations.",
+      "provider": "NOAA / NCEI",
+      "data_type": "realtime",
+      "category": "weather",
+      "geographical_coverage": ["Global"],
+      "source_url": "https://www.ncei.noaa.gov/products/land-based-station/global-historical-climatology-network-daily",
+      "license": "U.S. Government public domain",
+      "license_url": "https://www.noaa.gov/office-education/outreach-communication/faq",
+      "update_frequency": "Daily with weekly rebuilds",
+      "requires_key": false,
+      "schema_preview": [
+        {"name": "utc_time", "type": "datetime", "description": "Station calendar date represented at 00:00 UTC"},
+        {"name": "temperature_max_c", "type": "number", "unit": "degC"},
+        {"name": "temperature_min_c", "type": "number", "unit": "degC"},
+        {"name": "precipitation_mm", "type": "number", "unit": "mm/day"},
+        {"name": "wind_speed_ms", "type": "number", "unit": "m/s"},
+        {"name": "snowfall_mm", "type": "number", "unit": "mm/day"},
+        {"name": "snow_depth_mm", "type": "number", "unit": "mm"}
+      ],
+      "example": {
+        "zone": "USW00094728",
+        "start": "2025-01-01",
+        "end": "2025-01-03",
+        "options": {"variables": ["temperature_max_c", "temperature_min_c", "precipitation_mm"]}
+      }
+    }
+  ]
+}
