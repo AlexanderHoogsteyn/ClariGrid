@@ -24,7 +24,8 @@ For the United States, CAISO OASIS and NYISO provide no-auth market and system
 data. EIA-930 provides nationwide hourly balancing-authority load, forecasts,
 fuel generation, and physical interchange with a free EIA key.
 Global historical meteorology and solar data are available from NASA POWER
-without an API key; official U.S. hourly forecasts are available from NOAA/NWS.
+without an API key; official U.S. hourly forecasts are available from NOAA/NWS,
+and NOAA/NCEI provides daily U.S. station observations.
 ENTSO-E and other key-protected sources can be configured as described in
 [API key setup](#api-key-setup) below.
 
@@ -68,6 +69,7 @@ cg.connect("caiso")  # CAISO day-ahead hub prices (no key)
 cg.connect("nyiso")  # NYISO prices, load, forecasts and fuel mix (no key)
 cg.connect("nasapower")  # Global daily/hourly weather and solar data (no key)
 cg.connect("nws")  # Official U.S. hourly weather forecasts (no key)
+cg.connect("ncei")  # Official U.S. daily station observations (no key)
 
 # Optional: set output timezone (default is UTC).
 cg.set_timezone("Europe/Brussels")
@@ -93,6 +95,12 @@ nws_forecast = cg.get_weather(
     "2026-09-17",
     "2026-09-18",
     source="nws",
+)
+ncei_daily = cg.get_weather(
+    "USW00094728",
+    "2025-01-01",
+    "2025-01-07",
+    source="ncei",
 )
 ```
 
@@ -339,6 +347,7 @@ All data functions accept:
 | `nyiso` | day-ahead zonal LBMP, actual/forecast load, fuel mix and shares | New York ISO and NYISO load zones | None |
 | `nasapower` | daily/hourly meteorology, precipitation, wind and solar radiation | Global point locations (`lat,lon`) | None |
 | `nws` | hourly temperature, humidity, wind, cloud and precipitation-probability forecasts | U.S., territories and adjacent waters (`lat,lon`) | None |
+| `ncei` | daily temperature, precipitation, wind and snow observations | U.S. GHCN-Daily stations | None |
 | `metno` | temperature, pressure, humidity, cloud, wind and precipitation forecasts | Global point locations (`lat,lon`) | None |
 | `fmi` | hourly temperature, humidity, pressure, wind and precipitation observations | Finnish FMI stations (`fmisid`) | None |
 | `smard` | prices, load, generation | DE, AT, LU + TSO sub-zones | None |
@@ -364,6 +373,12 @@ zone (for example, `100971` for Helsinki Kaisaniemi). Results are normalized to
 UTC and canonical weather units; FMI's `-1` no-rain marker is normalized to
 zero millimetres. Reuse requires Finnish Meteorological Institute attribution
 under [CC BY 4.0](https://ftp.csc.fi/pub/sci/geo/geodata/ilmatiede/FMI_terms_of_use_2018.pdf).
+
+NCEI uses NOAA's official [Access Data Service v1](https://www.ncei.noaa.gov/support/access-data-service-api-user-documentation)
+for GHCN-Daily observations from U.S. stations. Pass an 11-character station
+ID such as `USW00094728`. Station calendar dates are represented at 00:00 UTC;
+values use metric canonical columns. NOAA requests source attribution for its
+[public-domain material](https://www.noaa.gov/office-education/outreach-communication/faq).
 
 EirGrid uses the official [Smart Grid Dashboard](https://www.smartgriddashboard.com/all/demand/)
 JSON feed for 15-minute Republic of Ireland and Northern Ireland system demand.
@@ -418,6 +433,7 @@ clarigrid/
 │   ├── nyiso.py          # NYISO prices, load, forecasts and fuel mix (US)
 │   ├── nasapower.py      # NASA POWER meteorology and solar data (global)
 │   ├── nws.py            # NOAA/NWS hourly grid forecasts (US)
+│   ├── ncei.py           # NOAA/NCEI daily station observations (US)
 │   ├── metno.py          # MET Norway global point forecasts
 │   ├── fmi.py            # FMI hourly station observations (Finland)
 │   └── entsog.py         # ENTSOG Transparency Platform (EU gas)
