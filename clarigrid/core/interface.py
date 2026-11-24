@@ -204,6 +204,7 @@ class WeatherDataProvider(DataProvider):
                 - MET Norway: ``"lat,lon"`` (e.g. ``"59.91,10.75"``)
                 - NCEI: U.S. GHCN station ID (e.g. ``"USW00094728"``)
                 - FMI: numeric ``fmisid`` station code (e.g. ``"100971"``)
+                - MeteoSwiss: three-letter SwissMetNet code (e.g. ``"ABO"``)
                 - RMI/SYNOP: station ID string (e.g. ``"6447"``)
                 - DWD: 5-digit station ID (e.g. ``"02564"``)
             start: ISO date string.
