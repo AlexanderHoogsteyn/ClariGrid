@@ -70,6 +70,7 @@ cg.connect("nyiso")  # NYISO prices, load, forecasts and fuel mix (no key)
 cg.connect("nasapower")  # Global daily/hourly weather and solar data (no key)
 cg.connect("nws")  # Official U.S. hourly weather forecasts (no key)
 cg.connect("ncei")  # Official U.S. daily station observations (no key)
+cg.connect("meteoswiss")  # Official Swiss hourly station observations (no key)
 
 # Optional: set output timezone (default is UTC).
 cg.set_timezone("Europe/Brussels")
@@ -101,6 +102,12 @@ ncei_daily = cg.get_weather(
     "2025-01-01",
     "2025-01-07",
     source="ncei",
+)
+swiss_hourly = cg.get_weather(
+    "ABO",
+    "2026-11-23",
+    "2026-11-24",
+    source="meteoswiss",
 )
 ```
 
@@ -350,6 +357,7 @@ All data functions accept:
 | `ncei` | daily temperature, precipitation, wind and snow observations | U.S. GHCN-Daily stations | None |
 | `metno` | temperature, pressure, humidity, cloud, wind and precipitation forecasts | Global point locations (`lat,lon`) | None |
 | `fmi` | hourly temperature, humidity, pressure, wind and precipitation observations | Finnish FMI stations (`fmisid`) | None |
+| `meteoswiss` | hourly temperature, humidity, pressure, wind, precipitation and sunshine observations | SwissMetNet stations (three-letter code) | None |
 | `smard` | prices, load, generation | DE, AT, LU + TSO sub-zones | None |
 | `elia` | load, generation | BE | None |
 | `neso` | load, embedded generation, actual/forecast CO2, generation shares | GB | None |
@@ -379,6 +387,13 @@ for GHCN-Daily observations from U.S. stations. Pass an 11-character station
 ID such as `USW00094728`. Station calendar dates are represented at 00:00 UTC;
 values use metric canonical columns. NOAA requests source attribution for its
 [public-domain material](https://www.noaa.gov/office-education/outreach-communication/faq).
+
+MeteoSwiss uses the official [SwissMetNet STAC collection](https://opendatadocs.meteoswiss.ch/a-data-groundbased/a1-automatic-weather-stations)
+for hourly observations from Swiss automatic stations. Pass a three-letter
+station code such as `ABO` for Adelboden. Windows-1252 source files and
+interval-end timestamps are normalized to canonical columns and UTC. Reuse is
+commercial and non-commercial under [CC BY 4.0](https://opendatadocs.meteoswiss.ch/general/terms-of-use)
+with the attribution `Source: MeteoSwiss`.
 
 EirGrid uses the official [Smart Grid Dashboard](https://www.smartgriddashboard.com/all/demand/)
 JSON feed for 15-minute Republic of Ireland and Northern Ireland system demand.
